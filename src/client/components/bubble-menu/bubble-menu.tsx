@@ -108,7 +108,7 @@ export class BubbleMenu extends React.Component<BubbleMenuProps, BubbleMenuState
     id: null
   };
 
-  componentWillMount() {
+  componentDidMount() {
     const { alignOn, openOn, id } = this.props;
     const rect = (alignOn || openOn).getBoundingClientRect();
 
@@ -116,9 +116,6 @@ export class BubbleMenu extends React.Component<BubbleMenuProps, BubbleMenuState
       id: id || uniqueId("bubble-menu-"),
       ...this.calcBubbleCoordinates(rect)
     });
-  }
-
-  componentDidMount() {
     window.addEventListener("mousedown", this.globalMouseDownListener);
     window.addEventListener("keydown", this.globalKeyDownListener);
   }
@@ -138,13 +135,13 @@ export class BubbleMenu extends React.Component<BubbleMenuProps, BubbleMenuState
 
     if (isInside(target, myElement) || isInside(target, openOn)) return;
     onClose();
-  }
+  };
 
   globalKeyDownListener = (e: KeyboardEvent) => {
     if (!escapeKey(e)) return;
     const { onClose } = this.props;
     onClose();
-  }
+  };
 
   private calcBubbleCoordinates(rect: ClientRect): Coordinates {
     const { direction, align } = this.props;
@@ -271,7 +268,7 @@ export class BubbleMenu extends React.Component<BubbleMenuProps, BubbleMenuState
     return <BodyPortal left={left} top={top} bottom={bottom}>
       <div className={myClass} id={id} data-parent={insideId} style={menuSize}>
         {children}
-        {hasShpitz && <Shpitz style={shpitzCoordinates} direction={direction}/>}
+        {hasShpitz && <Shpitz style={shpitzCoordinates} direction={direction} />}
       </div>
     </BodyPortal>;
   }

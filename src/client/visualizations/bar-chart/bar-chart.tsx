@@ -19,20 +19,19 @@ import * as d3 from "d3";
 import { List, Set } from "immutable";
 import { Dataset, Datum, NumberRange, PlywoodRange, PseudoDatum, Range } from "plywood";
 import * as React from "react";
-import * as ReactDOM from "react-dom";
-import { BAR_CHART_MANIFEST } from "../../../common/manifests/bar-chart/bar-chart";
 import { DateRange } from "../../../common/models/date-range/date-range";
 import { Dimension } from "../../../common/models/dimension/dimension";
-import { FixedTimeFilterClause, NumberFilterClause, StringFilterAction, StringFilterClause } from "../../../common/models/filter-clause/filter-clause";
-import { Filter } from "../../../common/models/filter/filter";
+import { FilterClause, FixedTimeFilterClause, NumberFilterClause, StringFilterAction, StringFilterClause } from "../../../common/models/filter-clause/filter-clause";
 import { Measure } from "../../../common/models/measure/measure";
 import { ConcreteSeries, SeriesDerivation } from "../../../common/models/series/concrete-series";
+import { Series } from "../../../common/models/series/series";
 import { SortDirection } from "../../../common/models/sort/sort";
 import { SplitType } from "../../../common/models/split/split";
 import { Splits } from "../../../common/models/splits/splits";
 import { Stage } from "../../../common/models/stage/stage";
 import { isLoaded } from "../../../common/models/visualization-props/visualization-props";
 import { formatValue } from "../../../common/utils/formatter/formatter";
+import { BAR_CHART_MANIFEST } from "../../../common/visualization-manifests/bar-chart/bar-chart";
 import { BucketMarks } from "../../components/bucket-marks/bucket-marks";
 import { GridLines } from "../../components/grid-lines/grid-lines";
 import { HighlightModal } from "../../components/highlight-modal/highlight-modal";
@@ -80,22 +79,20 @@ export interface BarChartState extends BaseVisualizationState {
   maxNumberOfLeaves?: number[];
 }
 
-function getFilterFromDatum(splits: Splits, dataPath: Datum[]): Filter {
-  return new Filter({
-    clauses: List(dataPath.map((datum, i) => {
-      const { type, reference } = splits.getSplit(i);
-      const segment: any = datum[reference];
+function getFilterFromDatum(splits: Splits, dataPath: Datum[]): List<FilterClause> {
+  return List(dataPath.map((datum, i) => {
+    const { type, reference } = splits.getSplit(i);
+    const segment: any = datum[reference];
 
-      switch (type) {
-        case SplitType.number:
-          return new NumberFilterClause({ reference, values: List.of(segment) });
-        case SplitType.time:
-          return new FixedTimeFilterClause({ reference, values: List.of(new DateRange(segment)) });
-        case SplitType.string:
-          return new StringFilterClause({ reference, action: StringFilterAction.IN, values: Set.of(segment) });
-      }
-    }))
-  });
+    switch (type) {
+      case SplitType.number:
+        return new NumberFilterClause({ reference, values: List.of(segment) });
+      case SplitType.time:
+        return new FixedTimeFilterClause({ reference, values: List.of(new DateRange(segment)) });
+      case SplitType.string:
+        return new StringFilterClause({ reference, action: StringFilterAction.IN, values: Set.of(segment) });
+    }
+  }));
 }
 
 function padDataset(originalDataset: Dataset, dimension: Dimension, measures: Measure[]): Dataset {
@@ -231,27 +228,25 @@ export class BarChart extends BaseVisualization<BarChartState> {
       scrollLeft,
       scrollTop
     });
-  }
+  };
 
   onMouseMove = (x: number, y: number) => {
     this.setState({ hoverInfo: this.calculateMousePosition(x, y) });
-  }
+  };
 
   onMouseLeave = () => {
     this.setState({ hoverInfo: null });
-  }
+  };
 
   onClick = (x: number, y: number) => {
-    const { essence, clicker } = this.props;
-
-    if (!clicker.changeHighlight || !clicker.dropHighlight) return;
+    const { essence } = this.props;
 
     const selectionInfo = this.calculateMousePosition(x, y);
 
     if (!selectionInfo) return;
 
     if (!selectionInfo.coordinates) {
-      clicker.dropHighlight();
+      this.dropHighlight();
       this.setState({ selectionInfo: null });
       return;
     }
@@ -263,17 +258,19 @@ export class BarChart extends BaseVisualization<BarChartState> {
 
     const rowHighlight = getFilterFromDatum(splits, path);
 
-    if (essence.highlightOn(series.get(chartIndex).measure.name)) {
-      if (rowHighlight.equals(essence.highlight.delta)) {
-        clicker.dropHighlight();
+    const currentSeries = series.get(chartIndex).definition;
+    if (this.highlightOn(currentSeries.key())) {
+      const delta = this.getHighlightClauses();
+      if (rowHighlight.equals(delta)) {
+        this.dropHighlight();
         this.setState({ selectionInfo: null });
         return;
       }
     }
 
     this.setState({ selectionInfo });
-    clicker.changeHighlight(series.get(chartIndex).measure.name, rowHighlight);
-  }
+    this.highlight(rowHighlight, series.get(chartIndex).definition.key());
+  };
 
   getYExtent(data: Datum[], series: ConcreteSeries): number[] {
     const getY = (d: Datum) => series.selectValue(d);
@@ -301,7 +298,7 @@ export class BarChart extends BaseVisualization<BarChartState> {
 
   getSingleChartStage(): Stage {
     const xScale = this.getPrimaryXScale();
-    const { essence, stage, isThumbnail } = this.props;
+    const { essence, stage } = this.props;
 
     const { stepWidth } = this.getBarDimensions(xScale.rangeBand());
     const xTicks = xScale.domain();
@@ -309,8 +306,7 @@ export class BarChart extends BaseVisualization<BarChartState> {
 
     const measures = essence.getConcreteSeries();
     const availableHeight = stage.height - X_AXIS_HEIGHT;
-    const minHeight = isThumbnail ? 1 : MIN_CHART_HEIGHT;
-    const height = Math.max(minHeight, Math.floor(availableHeight / measures.size));
+    const height = Math.max(MIN_CHART_HEIGHT, Math.floor(availableHeight / measures.size));
 
     return new Stage({
       x: 0,
@@ -390,13 +386,13 @@ export class BarChart extends BaseVisualization<BarChartState> {
     const topOffset = this.getBubbleTopOffset(coordinates.y, chartIndex, chartStage);
     if (!this.canShowBubble(leftOffset, topOffset)) return null;
 
-    const { clicker } = this.props;
     const segmentValue = series.formatValue(path[path.length - 1]);
     return <HighlightModal
       left={leftOffset}
       top={topOffset}
-      title={segmentLabel}
-      clicker={clicker}>
+      dropHighlight={this.dropHighlight}
+      acceptHighlight={this.acceptHighlight}
+      title={segmentLabel}>
       {segmentValue}
     </HighlightModal>;
   }
@@ -435,19 +431,18 @@ export class BarChart extends BaseVisualization<BarChartState> {
     />;
   }
 
-  isSelected(path: Datum[], measure: Measure): boolean {
+  isSelected(path: Datum[], series: Series): boolean {
     const { essence } = this.props;
-    const { highlight, splits } = essence;
-    return essence.highlightOn(measure.name) && highlight.delta.equals(getFilterFromDatum(splits, path));
+    const { splits } = essence;
+    return this.highlightOn(series.key()) && this.getHighlightClauses().equals(getFilterFromDatum(splits, path));
   }
 
   isFaded(): boolean {
-    const { essence } = this.props;
-    return essence.hasHighlight();
+    return this.hasHighlight();
   }
 
   hasAnySelectionGoingOn(): boolean {
-    return this.props.essence.hasHighlight();
+    return this.hasHighlight();
   }
 
   isHovered(path: Datum[], series: ConcreteSeries): boolean {
@@ -516,7 +511,7 @@ export class BarChart extends BaseVisualization<BarChartState> {
           bubble = this.renderHoverBubble(bubbleInfo);
         }
 
-        let selected = this.isSelected(subPath, series.measure);
+        let selected = this.isSelected(subPath, series.definition);
         let faded = this.isFaded();
         if (selected) {
           bubble = this.renderSelectionBubble(bubbleInfo);
@@ -672,10 +667,10 @@ export class BarChart extends BaseVisualization<BarChartState> {
     chartIndex: number,
     chartStage: Stage
   ): { yAxis: JSX.Element, chart: JSX.Element, highlight: JSX.Element } {
-    const { isThumbnail, essence } = this.props;
+    const { essence } = this.props;
     const mySplitDataset = dataset.data[0][SPLIT] as Dataset;
 
-    const measureLabel = !isThumbnail && <VisMeasureLabel
+    const measureLabel = <VisMeasureLabel
       series={series}
       datum={dataset.data[0]}
       showPrevious={essence.hasComparison()} />;

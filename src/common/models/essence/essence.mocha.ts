@@ -16,22 +16,24 @@
  */
 
 import { expect } from "chai";
-import { MANIFESTS } from "../../manifests";
-import { BAR_CHART_MANIFEST } from "../../manifests/bar-chart/bar-chart";
-import { LINE_CHART_MANIFEST } from "../../manifests/line-chart/line-chart";
-import { TABLE_MANIFEST } from "../../manifests/table/table";
-import { TOTALS_MANIFEST } from "../../manifests/totals/totals";
+import { SinonSpy, spy, stub } from "sinon";
+import { BAR_CHART_MANIFEST } from "../../visualization-manifests/bar-chart/bar-chart";
+import { LINE_CHART_MANIFEST } from "../../visualization-manifests/line-chart/line-chart";
+import { TABLE_MANIFEST } from "../../visualization-manifests/table/table";
+import { TOTALS_MANIFEST } from "../../visualization-manifests/totals/totals";
 import { DataCube, Introspection } from "../data-cube/data-cube";
 import { DataCubeFixtures } from "../data-cube/data-cube.fixtures";
 import { DimensionKind } from "../dimension/dimension";
-import { Highlight } from "../highlight/highlight";
-import { lineChartWithAddedMeasure, lineChartWithAvgAddedMeasure, tableNoMeasure } from "../highlight/highlight.fixtures";
+import { TimeFilterPeriod } from "../filter-clause/filter-clause";
+import { timePeriod } from "../filter-clause/filter-clause.fixtures";
+import { Filter } from "../filter/filter";
 import { MeasureFixtures } from "../measure/measure.fixtures";
 import { SeriesList } from "../series-list/series-list";
 import { MeasureSeries } from "../series/measure-series";
 import { DimensionSort, SortDirection } from "../sort/sort";
 import { Split, SplitType } from "../split/split";
 import { Splits } from "../splits/splits";
+import { TimeShift } from "../time-shift/time-shift";
 import { Essence, VisStrategy } from "./essence";
 import { EssenceFixtures } from "./essence.fixtures";
 
@@ -77,27 +79,9 @@ describe("EssenceProps", () => {
 
   const dataCube = DataCube.fromJS(dataCubeJS);
 
-  describe("removes highlight when necessary", () => {
-    const tests: Array<{ highlight: Highlight, expected: Highlight, description: string }> = [
-      { highlight: lineChartWithAddedMeasure(), expected: lineChartWithAddedMeasure(), description: "is kept when measure is selected" },
-      { highlight: tableNoMeasure(), expected: tableNoMeasure(), description: "is kept when contains no measure" },
-      { highlight: lineChartWithAvgAddedMeasure(), expected: null, description: "is removed when measure is not selected" }
-    ];
-
-    tests.forEach(({ highlight, expected, description }) => {
-      it(`highlight ${description}`, () => {
-        const wikiEssence = EssenceFixtures.wikiTable();
-        const essenceWithHighlight = wikiEssence.changeHighlight(highlight);
-
-        expect(essenceWithHighlight.highlight).to.deep.equal(expected);
-
-      });
-    });
-  });
-
   describe(".fromDataCube", () => {
     it.skip("works in the base case", () => {
-      const essence = Essence.fromDataCube(dataCube, MANIFESTS);
+      const essence = Essence.fromDataCube(dataCube);
 
       // TODO: don't test toJS
       expect(essence.toJS()).to.deep.equal({
@@ -169,7 +153,6 @@ describe("EssenceProps", () => {
       tests.forEach(({ splits, current, expected }) => {
         it(`chooses ${expected.name} given splits: [${splits}] with current ${current && current.name}`, () => {
           const { visualization } = Essence.getBestVisualization(
-            MANIFESTS,
             DataCubeFixtures.twitter(),
             Splits.fromSplits(splits),
             SeriesList.fromMeasureNames([]),
@@ -273,10 +256,14 @@ describe("EssenceProps", () => {
       });
 
       it("should handle adding too many splits for table", () => {
+        console.log("start it");
         const essence = EssenceFixtures.wikiTable();
+        console.log("splits before", essence.splits.length());
         const addedSplit = essence.addSplit(timeSplit, VisStrategy.KeepAlways);
+        console.log("splits after", addedSplit.splits.length());
 
         expect(addedSplit.splits.length()).to.be.eq(5);
+        console.log("visResolve", addedSplit.visResolve.state);
         expect(addedSplit.visResolve.isManual()).to.be.true;
         expect(addedSplit.visResolve.resolutions[0].adjustment.splits.length()).to.be.eq(4);
       });
@@ -292,5 +279,48 @@ describe("EssenceProps", () => {
       });
     });
 
+    describe("constrain timeshift", () => {
+      it("calls timeshift method with correct params", () => {
+        const essence = EssenceFixtures.wikiTable();
+        const timeFilterSpy = stub(essence, "timeFilter")
+          .returns("stubbed-time-filter");
+        const constrainToFilterSpy = stub(essence.timeShift, "constrainToFilter")
+          .returns("constrained-time-shift");
+
+        // @ts-ignore
+        const newEssence = essence.constrainTimeShift();
+
+        expect(timeFilterSpy.calledOnce).to.be.true;
+        expect(constrainToFilterSpy.calledWith("stubbed-time-filter", essence.timezone)).to.be.true;
+        expect(newEssence.timeShift).to.be.eq("constrained-time-shift");
+      });
+
+      describe("is called when", () => {
+        let constrainTimeShiftSpy: SinonSpy;
+
+        beforeEach(() => {
+          // @ts-ignore
+          constrainTimeShiftSpy = spy(Essence.prototype, "constrainTimeShift");
+        });
+
+        afterEach(() => {
+          constrainTimeShiftSpy.restore();
+        });
+
+        it("changing filter", () => {
+          const essence = EssenceFixtures.wikiTable();
+          essence.changeFilter(Filter.fromClause(timePeriod("time", "P1W", TimeFilterPeriod.LATEST)));
+
+          expect(constrainTimeShiftSpy.calledOnce).to.be.true;
+        });
+
+        it("changing time shift", () => {
+          const essence = EssenceFixtures.wikiTable();
+          essence.changeComparisonShift(TimeShift.fromJS("P1M"));
+
+          expect(constrainTimeShiftSpy.calledOnce).to.be.true;
+        });
+      });
+    });
   });
 });

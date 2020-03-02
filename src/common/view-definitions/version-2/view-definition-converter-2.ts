@@ -16,7 +16,6 @@
 
 import { Duration, Timezone } from "chronoshift";
 import { List, OrderedSet, Set } from "immutable";
-import { NamedArray } from "immutable-class";
 import {
   AndExpression,
   ChainableExpression,
@@ -51,13 +50,12 @@ import {
   TimeFilterPeriod
 } from "../../models/filter-clause/filter-clause";
 import { Filter } from "../../models/filter/filter";
-import { Highlight } from "../../models/highlight/highlight";
-import { Manifest } from "../../models/manifest/manifest";
 import { SeriesList } from "../../models/series-list/series-list";
 import { DimensionSort, SeriesSort, Sort } from "../../models/sort/sort";
 import { kindToType, Split } from "../../models/split/split";
 import { Splits } from "../../models/splits/splits";
 import { TimeShift } from "../../models/time-shift/time-shift";
+import { manifestByName } from "../../visualization-manifests";
 import { ViewDefinitionConverter } from "../view-definition-converter";
 import { ViewDefinition2 } from "./view-definition-2";
 
@@ -66,8 +64,9 @@ export type FilterSelection = Expression | string;
 export class ViewDefinitionConverter2 implements ViewDefinitionConverter<ViewDefinition2, Essence> {
   version = 2;
 
-  fromViewDefinition(definition: ViewDefinition2, dataCube: DataCube, visualizations: Manifest[]): Essence {
-    const visualization = NamedArray.findByName(visualizations, definition.visualization);
+  fromViewDefinition(definition: ViewDefinition2, dataCube: DataCube): Essence {
+    const visualization = manifestByName(definition.visualization);
+    const visualizationSettings = visualization.visualizationSettings.defaults;
 
     const measureNames = definition.multiMeasureMode ? definition.selectedMeasures : [definition.singleMeasure];
     const series = SeriesList.fromMeasures(dataCube.measures.getMeasuresByNames(measureNames));
@@ -78,21 +77,25 @@ export class ViewDefinitionConverter2 implements ViewDefinitionConverter<ViewDef
     const timeShift = TimeShift.empty();
     const colors = definition.colors && Colors.fromJS(definition.colors);
     const pinnedSort = definition.pinnedSort;
-    const highlight = readHighlight(definition.highlight, dataCube);
-    return new Essence({ dataCube, visualizations, visualization, timezone, filter, timeShift, splits, pinnedDimensions, series, colors, pinnedSort, highlight });
+
+    return new Essence({
+      dataCube,
+      visualization,
+      visualizationSettings,
+      timezone,
+      filter,
+      timeShift,
+      splits,
+      pinnedDimensions,
+      series,
+      colors,
+      pinnedSort
+    });
   }
 
   toViewDefinition(essence: Essence): ViewDefinition2 {
     throw new Error("toViewDefinition is not supported in Version 2");
   }
-}
-
-function readHighlight(definition: any, dataCube: DataCube): Highlight {
-  if (!definition) return null;
-  const { measure } = definition;
-  const delta = Filter.fromClauses(filterJSConverter(definition.delta, dataCube));
-  return new Highlight({ measure, delta });
-
 }
 
 function isBooleanFilterSelection(selection: FilterSelection): selection is LiteralExpression {
@@ -263,6 +266,6 @@ function convertSplit(split: any, dataCube: DataCube): Split {
   return new Split({ type, reference, sort, limit, bucket });
 }
 
-function splitJSConverter(splits: any[], dataCube: DataCube): Split[] {
+export default function splitJSConverter(splits: any[], dataCube: DataCube): Split[] {
   return splits.map(split => convertSplit(split, dataCube));
 }

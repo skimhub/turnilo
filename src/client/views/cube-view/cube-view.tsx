@@ -18,8 +18,6 @@
 import { Timezone } from "chronoshift";
 import { Dataset, TabulatorOptions } from "plywood";
 import * as React from "react";
-import * as ReactDOM from "react-dom";
-import { MANIFESTS } from "../../../common/manifests";
 import { Clicker } from "../../../common/models/clicker/clicker";
 import { Colors } from "../../../common/models/colors/colors";
 import { Customization } from "../../../common/models/customization/customization";
@@ -28,8 +26,6 @@ import { Device, DeviceSize } from "../../../common/models/device/device";
 import { Dimension } from "../../../common/models/dimension/dimension";
 import { Essence, VisStrategy } from "../../../common/models/essence/essence";
 import { Filter } from "../../../common/models/filter/filter";
-import { Highlight } from "../../../common/models/highlight/highlight";
-import { Manifest } from "../../../common/models/manifest/manifest";
 import { Measure } from "../../../common/models/measure/measure";
 import { SeriesList } from "../../../common/models/series-list/series-list";
 import { Series } from "../../../common/models/series/series";
@@ -39,8 +35,10 @@ import { Stage } from "../../../common/models/stage/stage";
 import { TimeShift } from "../../../common/models/time-shift/time-shift";
 import { Timekeeper } from "../../../common/models/timekeeper/timekeeper";
 import { ViewSupervisor } from "../../../common/models/view-supervisor/view-supervisor";
+import { VisualizationManifest } from "../../../common/models/visualization-manifest/visualization-manifest";
 import { VisualizationProps } from "../../../common/models/visualization-props/visualization-props";
 import { Nullary } from "../../../common/utils/functional/functional";
+import { VisualizationSettings } from "../../../common/models/visualization-settings/visualization-settings";
 import { Fn } from "../../../common/utils/general/general";
 import { datesEqual } from "../../../common/utils/time/time";
 import { DimensionMeasurePanel } from "../../components/dimension-measure-panel/dimension-measure-panel";
@@ -50,9 +48,8 @@ import { GlobalEventListener } from "../../components/global-event-listener/glob
 import { ManualFallback } from "../../components/manual-fallback/manual-fallback";
 import { PinboardPanel } from "../../components/pinboard-panel/pinboard-panel";
 import { Direction, DragHandle, ResizeHandle } from "../../components/resize-handle/resize-handle";
-import { SeriesTile } from "../../components/series-tile/series-tile";
 import { SeriesTilesRow } from "../../components/series-tile/series-tiles-row";
-import { SplitTile } from "../../components/split-tile/split-tile";
+import { SplitTilesRow } from "../../components/split-tile/split-tiles-row";
 import { SvgIcon } from "../../components/svg-icon/svg-icon";
 import { VisSelector } from "../../components/vis-selector/vis-selector";
 import { DruidQueryModal } from "../../modals/druid-query-modal/druid-query-modal";
@@ -94,7 +91,7 @@ export interface CubeViewProps {
   hash: string;
   updateViewHash: (newHash: string, force?: boolean) => void;
   getCubeViewHash?: (essence: Essence, withPrefix?: boolean) => string;
-  getEssenceFromHash: (hash: string, dateCube: DataCube, visualizations: Manifest[]) => Essence;
+  getEssenceFromHash: (hash: string, dateCube: DataCube) => Essence;
   dataCube: DataCube;
   onNavClick?: Fn;
   customization?: Customization;
@@ -140,9 +137,9 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
   private container = React.createRef<HTMLDivElement>();
   private filterTile = React.createRef<FilterTile>();
   private seriesTile = React.createRef<SeriesTilesRow>();
-  private splitTile = React.createRef<SplitTile>();
+  private splitTile = React.createRef<SplitTilesRow>();
 
-    constructor(props: CubeViewProps) {
+  constructor(props: CubeViewProps) {
     super(props);
 
     this.state = {
@@ -199,9 +196,9 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
         const { essence } = this.state;
         this.setState({ essence: essence.changeColors(colors) });
       },
-      changeVisualization: (visualization: Manifest) => {
+      changeVisualization: (visualization: VisualizationManifest, settings: VisualizationSettings) => {
         const { essence } = this.state;
-        this.setState({ essence: essence.changeVisualization(visualization) });
+        this.setState({ essence: essence.changeVisualization(visualization, settings) });
       },
       pin: (dimension: Dimension) => {
         const { essence } = this.state;
@@ -214,18 +211,6 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
       changePinnedSortMeasure: (measure: Measure) => {
         const { essence } = this.state;
         this.setState({ essence: essence.changePinnedSortMeasure(measure) });
-      },
-      changeHighlight: (measure: string, delta: Filter) => {
-        const { essence } = this.state;
-        this.setState({ essence: essence.changeHighlight(new Highlight({ measure, delta })) });
-      },
-      acceptHighlight: () => {
-        const { essence } = this.state;
-        this.setState({ essence: essence.acceptHighlight() });
-      },
-      dropHighlight: () => {
-        const { essence } = this.state;
-        this.setState({ essence: essence.dropHighlight() });
       }
     };
   }
@@ -251,7 +236,7 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
           lastRefreshRequestTimestamp: (new Date()).getTime()
         });
       });
-  }
+  };
 
   componentWillMount() {
     const { hash, dataCube, initTimekeeper } = this.props;
@@ -331,7 +316,7 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
   }
 
   getEssenceFromDataCube(dataCube: DataCube): Essence {
-    return Essence.fromDataCube(dataCube, MANIFESTS);
+    return Essence.fromDataCube(dataCube);
   }
 
   getEssenceFromHash(hash: string, dataCube: DataCube): Essence {
@@ -344,7 +329,7 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
     }
 
     const { getEssenceFromHash } = this.props;
-    return getEssenceFromHash(hash, dataCube, MANIFESTS);
+    return getEssenceFromHash(hash, dataCube);
   }
 
   globalResizeListener = () => {
@@ -357,7 +342,7 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
       menuStage: Stage.fromClientRect(containerDOM.getBoundingClientRect()),
       visualizationStage: Stage.fromClientRect(visualizationDOM.getBoundingClientRect())
     });
-  }
+  };
 
   private isSmallDevice(): boolean {
     return this.state.deviceSize === DeviceSize.SMALL;
@@ -367,16 +352,16 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
     if (!CubeView.canDrop()) return;
     e.preventDefault();
     this.setState({ dragOver: true });
-  }
+  };
 
   dragOver = (e: React.DragEvent<HTMLElement>) => {
     if (!CubeView.canDrop()) return;
     e.preventDefault();
-  }
+  };
 
   dragLeave = () => {
     this.setState({ dragOver: false });
-  }
+  };
 
   drop = (e: React.DragEvent<HTMLElement>) => {
     if (!CubeView.canDrop()) return;
@@ -386,19 +371,19 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
       this.clicker.changeSplit(Split.fromDimension(dimension), VisStrategy.FairGame);
     }
     this.setState({ dragOver: false });
-  }
+  };
 
   openRawDataModal = () => {
     this.setState({
       showRawDataModal: true
     });
-  }
+  };
 
   onRawDataModalClose = () => {
     this.setState({
       showRawDataModal: false
     });
-  }
+  };
 
   renderRawDataModal() {
     const { showRawDataModal, essence, timekeeper } = this.state;
@@ -415,13 +400,13 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
     this.setState({
       showViewDefinitionModal: true
     });
-  }
+  };
 
   onViewDefinitionModalClose = () => {
     this.setState({
       showViewDefinitionModal: false
     });
-  }
+  };
 
   renderViewDefinitionModal() {
     const { showViewDefinitionModal, essence } = this.state;
@@ -437,13 +422,13 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
     this.setState({
       showDruidQueryModal: true
     });
-  }
+  };
 
   closeDruidQueryModal = () => {
     this.setState({
       showDruidQueryModal: false
     });
-  }
+  };
 
   renderDruidQueryModal() {
     const { showDruidQueryModal, essence, timekeeper } = this.state;
@@ -458,13 +443,13 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
     this.setState({
       urlShortenerModalProps: { url, title }
     });
-  }
+  };
 
   closeUrlShortenerModal = () => {
     this.setState({
       urlShortenerModalProps: null
     });
-  }
+  };
 
   renderUrlShortenerModal() {
     const { urlShortenerModalProps } = this.state;
@@ -478,18 +463,18 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
   triggerFilterMenu = (dimension: Dimension) => {
     if (!dimension) return;
     this.filterTile.current.filterMenuRequest(dimension);
-  }
+  };
 
   appendDirtySeries = (series: Series) => {
     if (!series) return;
     this.seriesTile.current.appendDirtySeries(series);
-  }
+  };
 
   changeTimezone = (newTimezone: Timezone) => {
     const { essence } = this.state;
     const newEssence = essence.changeTimezone(newTimezone);
     this.setState({ essence: newEssence });
-  }
+  };
 
   getStoredLayout(): CubeViewLayout {
     return localStorage.get("cube-view-layout-v2") || defaultLayout;
@@ -513,7 +498,7 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
         hidden: !factPanel.hidden
       }
     });
-  }
+  };
 
   togglePinboard = () => {
     const { layout: { pinboard }, layout } = this.state;
@@ -524,7 +509,7 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
         hidden: !pinboard.hidden
       }
     });
-  }
+  };
 
   onFactPanelResize = (width: number) => {
     const { layout: { factPanel }, layout } = this.state;
@@ -535,7 +520,7 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
         width
       }
     });
-  }
+  };
 
   onPinboardPanelResize = (width: number) => {
     const { layout: { pinboard }, layout } = this.state;
@@ -546,11 +531,11 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
         width
       }
     });
-  }
+  };
 
   onPanelResizeEnd = () => {
     this.globalResizeListener();
-  }
+  };
 
   render() {
     const clicker = this.clicker;
@@ -616,7 +601,7 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
                 timekeeper={timekeeper}
                 menuStage={visualizationStage}
               />
-              <SplitTile
+              <SplitTilesRow
                 ref={this.splitTile}
                 clicker={clicker}
                 essence={essence}
@@ -661,7 +646,7 @@ export class CubeView extends React.Component<CubeViewProps, CubeViewState> {
           max={MAX_PANEL_WIDTH}
         >
           <DragHandle />
-         </ResizeHandle>}
+        </ResizeHandle>}
         {!layout.pinboard.hidden && <PinboardPanel
           style={styles.pinboardPanel}
           clicker={clicker}

@@ -32,6 +32,8 @@ export function noop(...args: any[]): any {
 
 export const identity = <T>(x: T): T => x;
 
+export const constant = <T>(val: T): Nullary<T> => () => val;
+
 export function cons<T>(coll: T[], element: T): T[] {
   return coll.concat([element]);
 }
@@ -67,6 +69,16 @@ export function threadConditionally(x: any, ...fns: Function[]) {
 
 export function complement<T>(p: Predicate<T>): Predicate<T> {
   return (x: T) => !p(x);
+}
+
+export function range(from: number, to: number): number[] {
+  const result = [];
+  let n = from;
+  while (n < to) {
+    result.push(n);
+    n += 1;
+  }
+  return result;
 }
 
 // TODO: fix to use infer on arguments tuple https://stackoverflow.com/a/50014868/1089761

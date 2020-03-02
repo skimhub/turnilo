@@ -16,19 +16,19 @@
 
 import { day, Duration, Timezone } from "chronoshift";
 import { OrderedSet } from "immutable";
-import { MANIFESTS } from "../../manifests";
-import { TOTALS_MANIFEST } from "../../manifests/totals/totals";
 import { Essence, EssenceValue } from "../../models/essence/essence";
 import { RelativeTimeFilterClause, TimeFilterPeriod } from "../../models/filter-clause/filter-clause";
 import { Filter } from "../../models/filter/filter";
 import { SeriesList } from "../../models/series-list/series-list";
 import { Splits } from "../../models/splits/splits";
 import { TimeShift } from "../../models/time-shift/time-shift";
+import { TOTALS_MANIFEST } from "../../visualization-manifests/totals/totals";
 import { dataCube } from "./data-cube.fixture";
 import { count, sum } from "./measure";
 
 type EssenceKeys
   = "visualization"
+  | "visualizationSettings"
   | "timezone"
   | "filter"
   | "splits"
@@ -36,32 +36,34 @@ type EssenceKeys
   | "pinnedDimensions"
   | "pinnedSort"
   | "colors"
-  | "highlight"
   | "timeShift";
 
 type EssenceOptions = Pick<EssenceValue, EssenceKeys>;
 
+export const defaultTimeClause = new RelativeTimeFilterClause({
+  reference: "time",
+  duration: Duration.fromCanonicalLength(day.canonicalLength),
+  period: TimeFilterPeriod.PREVIOUS
+});
+
+// reuse this in fixtures (AnyObject - minimal case)
+// random values for fields that are note essential for test case
 const defaults: EssenceOptions = {
-  filter: Filter.fromClause(new RelativeTimeFilterClause({
-    reference: "time",
-    duration: Duration.fromCanonicalLength(day.canonicalLength),
-    period: TimeFilterPeriod.PREVIOUS
-  })),
+  filter: Filter.fromClause(defaultTimeClause),
   series: SeriesList.fromMeasures([count, sum]),
   splits: Splits.fromSplits([]),
   colors: null,
-  highlight: null,
   pinnedDimensions: OrderedSet(["string_a"]),
   pinnedSort: "count",
   timeShift: TimeShift.empty(),
   timezone: Timezone.UTC,
-  visualization: TOTALS_MANIFEST
+  visualization: TOTALS_MANIFEST,
+  visualizationSettings: null
 };
 
 export function mockEssence(opts: Partial<EssenceOptions> = {}) {
   return new Essence({
     dataCube,
-    visualizations: MANIFESTS,
     ...defaults,
     ...opts
   });

@@ -58,19 +58,19 @@ export class InputWithPresets<T> extends React.Component<InputWithPresetsProps<T
     const customValue = e.currentTarget.value;
     onChange(parseCustomValue(customValue));
     this.setState({ customValue });
-  }
+  };
 
   pickCustom = () => {
     const { onChange, parseCustomValue } = this.props;
     this.setState({ customPicked: true });
     onChange(parseCustomValue(this.state.customValue));
-  }
+  };
 
   pickPreset = (value: T) => {
     const { onChange } = this.props;
     this.setState({ customPicked: false });
     onChange(value);
-  }
+  };
 
   render() {
     const { errorMessage, selected, presets, placeholder, title, parseCustomValue } = this.props;
@@ -85,7 +85,7 @@ export class InputWithPresets<T> extends React.Component<InputWithPresetsProps<T
 
     const customSelected = customPicked && selected === parseCustomValue(customValue);
 
-    const customButton: GroupMember<T> = {
+    const customButton: GroupMember = {
       key: "custom",
       title: "…",
       onClick: this.pickCustom,
@@ -97,7 +97,7 @@ export class InputWithPresets<T> extends React.Component<InputWithPresetsProps<T
     const renderErrorMessage = customSelected && errorMessage && customValue.length > 0;
 
     return <React.Fragment>
-      <ButtonGroup<T> title={title} groupMembers={members} />
+      <ButtonGroup title={title} groupMembers={members} />
       {customSelected && <input type="text"
                                 className={classNames("custom-input", { invalid: errorMessage })}
                                 placeholder={placeholder}

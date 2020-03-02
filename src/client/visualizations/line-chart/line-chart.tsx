@@ -22,15 +22,13 @@ import { immutableEqual } from "immutable-class";
 import { Dataset, Datum, NumberRange, NumberRangeJS, PlywoodRange, Range, TimeRange, TimeRangeJS } from "plywood";
 import * as React from "react";
 import * as ReactDOM from "react-dom";
-import { LINE_CHART_MANIFEST } from "../../../common/manifests/line-chart/line-chart";
 import { DateRange } from "../../../common/models/date-range/date-range";
 import { Dimension } from "../../../common/models/dimension/dimension";
 import { Essence } from "../../../common/models/essence/essence";
 import { FixedTimeFilterClause, NumberFilterClause, NumberRange as FilterNumberRange } from "../../../common/models/filter-clause/filter-clause";
-import { Filter } from "../../../common/models/filter/filter";
 import { ContinuousDimensionKind, getBestBucketUnitForRange } from "../../../common/models/granularity/granularity";
-import { Measure } from "../../../common/models/measure/measure";
 import { ConcreteSeries, SeriesDerivation } from "../../../common/models/series/concrete-series";
+import { Series } from "../../../common/models/series/series";
 import { Split } from "../../../common/models/split/split";
 import { Splits } from "../../../common/models/splits/splits";
 import { Stage } from "../../../common/models/stage/stage";
@@ -39,6 +37,7 @@ import { VisualizationProps } from "../../../common/models/visualization-props/v
 import { concatTruthy, flatMap, Unary } from "../../../common/utils/functional/functional";
 import { readNumber } from "../../../common/utils/general/general";
 import { union } from "../../../common/utils/plywood/range";
+import { LINE_CHART_MANIFEST } from "../../../common/visualization-manifests/line-chart/line-chart";
 import { ChartLine } from "../../components/chart-line/chart-line";
 import { GlobalEventListener } from "../../components/global-event-listener/global-event-listener";
 import { GridLines } from "../../components/grid-lines/grid-lines";
@@ -141,18 +140,17 @@ export class LineChart extends BaseVisualization<LineChartState> {
     return getXFromEvent(e) - (rect.left + VIS_H_PADDING);
   }
 
-  onMouseDown = (measure: Measure, e: React.MouseEvent<HTMLDivElement>) => {
-    const { clicker } = this.props;
+  onMouseDown = (series: Series, e: React.MouseEvent<HTMLDivElement>) => {
     const { scaleX } = this.state;
-    if (!scaleX || !clicker.dropHighlight || !clicker.changeHighlight) return;
+    if (!scaleX) return;
 
     const dragStartValue = scaleX.invert(this.getMyEventX(e));
     this.setState({
       dragStartValue,
       dragRange: null,
-      dragOnMeasure: measure
+      dragOnSeries: series
     });
-  }
+  };
 
   onMouseMove = (dataset: Dataset, scaleX: any, e: React.MouseEvent<HTMLDivElement>) => {
     const { essence } = this.props;
@@ -181,7 +179,7 @@ export class LineChart extends BaseVisualization<LineChartState> {
         hoverRange: currentHoverRange
       });
     }
-  }
+  };
 
   getDragRange(e: MouseEvent): PlywoodRange | null {
     const { dragStartValue, axisRange, scaleX } = this.state;
@@ -242,40 +240,36 @@ export class LineChart extends BaseVisualization<LineChartState> {
     this.setState({
       dragRange
     });
-  }
+  };
 
   globalMouseUpListener = (e: MouseEvent) => {
-    const { clicker, essence } = this.props;
-    const { dragStartValue, dragRange, dragOnMeasure } = this.state;
+    const { dragStartValue, dragRange, dragOnSeries } = this.state;
     if (dragStartValue === null) return;
 
     const newDragRange = this.getDragRange(e);
     this.resetDrag();
     if (!newDragRange) return;
-    const highlightRange = this.floorRange(newDragRange);
+    const flooredDragRange = this.floorRange(newDragRange);
 
     // If already highlighted and user clicks within it switches measure
-    if (!dragRange && essence.hasHighlight()) {
-      const { highlight: { delta, measure } } = essence;
-      const existingHighlightRange = essence.getHighlightRange();
-      if (existingHighlightRange.contains(highlightRange.start) && measure !== dragOnMeasure.name) {
-        clicker.changeHighlight(dragOnMeasure.name, delta);
+    if (!dragRange && this.hasHighlight()) {
+      const existingHighlightRange = this.highlightRange();
+      if (!this.highlightOn(dragOnSeries.key()) && existingHighlightRange.contains(flooredDragRange.start)) {
+        const { clauses } = this.getHighlight();
+        this.highlight(clauses, dragOnSeries.key());
         return;
       }
     }
 
     const continuousDimension = this.getContinuousDimension();
     const reference = continuousDimension.name;
-    const { start, end } = highlightRange;
+    const { start, end } = flooredDragRange;
     const filterClause = continuousDimension.kind === "number"
       ? new NumberFilterClause({ reference, values: List.of(new FilterNumberRange({ start: start as number, end: end as number })) })
       : new FixedTimeFilterClause({ reference, values: List.of(new DateRange({ start: start as Date, end: end as Date })) });
 
-    clicker.changeHighlight(
-      dragOnMeasure.name,
-      Filter.fromClause(filterClause)
-    );
-  }
+    this.highlight(List.of(filterClause), dragOnSeries.key());
+  };
 
   globalKeyDownListener = (e: KeyboardEvent) => {
     if (!escapeKey(e)) return;
@@ -284,13 +278,13 @@ export class LineChart extends BaseVisualization<LineChartState> {
     if (dragStartValue === null) return;
 
     this.resetDrag();
-  }
+  };
 
   resetDrag() {
     this.setState({
       dragStartValue: null,
       dragRange: null,
-      dragOnMeasure: null
+      dragOnSeries: null
     });
   }
 
@@ -298,17 +292,26 @@ export class LineChart extends BaseVisualization<LineChartState> {
     this.setState({
       hoverRange: null
     });
+  };
+
+  highlightRange(): PlywoodRange {
+    const clauses = this.getHighlightClauses();
+    if (!clauses) return null;
+    const clause = clauses.first();
+    if ((clause instanceof NumberFilterClause) || (clause instanceof FixedTimeFilterClause)) {
+      return Range.fromJS(clause.values.first());
+    }
+    return null;
   }
 
   renderHighlighter(): JSX.Element {
-    const { essence } = this.props;
     const { dragRange, scaleX } = this.state;
 
     if (dragRange !== null) {
       return <Highlighter highlightRange={dragRange} scaleX={scaleX} />;
     }
-    if (essence.hasHighlight()) {
-      const highlightRange = essence.getHighlightRange();
+    if (this.hasHighlight()) {
+      const highlightRange = this.highlightRange();
       return <Highlighter highlightRange={highlightRange} scaleX={scaleX} />;
     }
     return null;
@@ -323,26 +326,27 @@ export class LineChart extends BaseVisualization<LineChartState> {
     extentY: number[],
     scaleY: any
   ): JSX.Element {
-    const { clicker, essence } = this.props;
-    const { highlight } = essence;
+    const { essence } = this.props;
 
     const { containerYPosition, containerXPosition, scrollTop, dragRange } = this.state;
-    const { dragOnMeasure, scaleX, hoverRange } = this.state;
+    const { dragOnSeries, scaleX, hoverRange } = this.state;
 
-    if (highlight && !essence.highlightOn(series.measure.name)) return null;
+    const highlightOnDifferentSeries = this.hasHighlight() && !this.highlightOn(series.definition.key());
+    if (highlightOnDifferentSeries) return null;
 
     const topOffset = chartStage.height * chartIndex + scaleY(extentY[1]) + TEXT_SPACER - scrollTop;
     if (topOffset < 0) return null;
 
-    if ((dragRange && dragOnMeasure === series.measure) || (!dragRange && essence.highlightOn(series.measure.name))) {
-      const highlightRange = dragRange || essence.getHighlightRange();
+    if ((dragRange && dragOnSeries.equals(series)) || (!dragRange && this.highlightOn(series.definition.key()))) {
+      const highlightRange = dragRange || this.highlightRange();
       const leftOffset = containerXPosition + VIS_H_PADDING + scaleX(highlightRange.midpoint());
       return <HighlightTooltip
         highlightRange={highlightRange}
         dataset={dataset}
         series={series}
         essence={essence}
-        clicker={clicker}
+        dropHighlight={this.dropHighlight}
+        acceptHighlight={this.acceptHighlight}
         topOffset={topOffset + containerYPosition}
         leftOffset={leftOffset} />;
     } else if (!dragRange && hoverRange) {
@@ -475,7 +479,7 @@ export class LineChart extends BaseVisualization<LineChartState> {
   }
 
   renderChart(dataset: Dataset, series: ConcreteSeries, chartIndex: number, containerStage: Stage, chartStage: Stage): JSX.Element {
-    const { essence, isThumbnail } = this.props;
+    const { essence } = this.props;
     const { splits } = essence;
     const formatter = series.formatter();
 
@@ -493,14 +497,13 @@ export class LineChart extends BaseVisualization<LineChartState> {
     const extent = this.calculateExtend(splitData, splits, getY, getYP);
     const scale = this.getScale(extent, lineStage);
 
-    const hasHighlight = !!essence.getHighlightRange();
     const isHovered = !dragRange && !!hoverRange;
-    const isHoveredWithoutHighlight = isHovered && !hasHighlight;
+    const isHoveredWithoutHighlight = isHovered && !this.hasHighlight();
 
     return <React.Fragment key={series.reactKey()}>
       <div
         className="measure-line-chart"
-        onMouseDown={e => this.onMouseDown(series.measure, e)}
+        onMouseDown={e => this.onMouseDown(series.definition, e)}
         onMouseMove={e => this.onMouseMove(splitData, scaleX, e)}
         onMouseLeave={() => this.onMouseLeave()}
       >
@@ -523,10 +526,10 @@ export class LineChart extends BaseVisualization<LineChartState> {
             y2={chartStage.height - 0.5}
           />
         </svg>
-        {!isThumbnail && <VisMeasureLabel
+        <VisMeasureLabel
           series={series}
           datum={datum}
-          showPrevious={essence.hasComparison()} />}
+          showPrevious={essence.hasComparison()} />
         {this.renderHighlighter()}
       </div>
       {scale && this.renderChartBubble(splitData, series, chartIndex, containerStage, chartStage, extent, scale)}
@@ -667,7 +670,7 @@ export class LineChart extends BaseVisualization<LineChartState> {
       hoverRange: null,
       hoverSeries: null
     }));
-  }
+  };
 
   renderInternals(dataset: Dataset) {
     const { essence, stage } = this.props;

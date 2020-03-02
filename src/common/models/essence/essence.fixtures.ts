@@ -15,18 +15,16 @@
  * limitations under the License.
  */
 
-import { Timezone } from "chronoshift";
+import { Duration, Timezone } from "chronoshift";
 import { List, OrderedSet } from "immutable";
-import { MANIFESTS } from "../../manifests";
-import { LINE_CHART_MANIFEST } from "../../manifests/line-chart/line-chart";
-import { TABLE_MANIFEST } from "../../manifests/table/table";
-import { TOTALS_MANIFEST } from "../../manifests/totals/totals";
+import { LINE_CHART_MANIFEST } from "../../visualization-manifests/line-chart/line-chart";
+import { TABLE_MANIFEST } from "../../visualization-manifests/table/table";
+import { TOTALS_MANIFEST } from "../../visualization-manifests/totals/totals";
 import { Colors } from "../colors/colors";
 import { DataCubeFixtures } from "../data-cube/data-cube.fixtures";
-import { NumberFilterClause, NumberRange, TimeFilterPeriod } from "../filter-clause/filter-clause";
+import { NumberFilterClause, NumberRange, RelativeTimeFilterClause, TimeFilterPeriod } from "../filter-clause/filter-clause";
 import { boolean, numberRange, stringContains, stringIn, stringMatch, timePeriod, timeRange } from "../filter-clause/filter-clause.fixtures";
 import { Filter } from "../filter/filter";
-import { Highlight } from "../highlight/highlight";
 import { EMPTY_SERIES, SeriesList } from "../series-list/series-list";
 import { SortDirection } from "../sort/sort";
 import { numberSplitCombine, stringSplitCombine, timeSplitCombine } from "../split/split.fixtures";
@@ -36,14 +34,18 @@ import { Essence, EssenceValue } from "./essence";
 
 const defaultEssence: EssenceValue = {
   dataCube: DataCubeFixtures.customCube("essence-fixture-data-cube", "essence-fixture-data-cube"),
-  visualizations: MANIFESTS,
   visualization: null,
+  visualizationSettings: null,
   timezone: Timezone.UTC,
   pinnedDimensions: OrderedSet([]),
-  filter: new Filter({ clauses: List.of(new NumberFilterClause({ reference: "commentLength", values: List.of(new NumberRange({ start: 1, end: 100 })) })) }),
+  filter: new Filter({
+    clauses: List([
+      new NumberFilterClause({ reference: "commentLength", values: List.of(new NumberRange({ start: 1, end: 100 })) }),
+      new RelativeTimeFilterClause({ reference: "time", period: TimeFilterPeriod.LATEST, duration: Duration.fromJS("P1D") })
+    ])
+  }),
   colors: null,
   pinnedSort: null,
-  highlight: null,
   splits: EMPTY_SPLITS,
   timeShift: TimeShift.empty(),
   series: EMPTY_SERIES
@@ -74,15 +76,13 @@ export class EssenceFixtures {
 
   static getWikiContext() {
     return {
-      dataCube: DataCubeFixtures.wiki(),
-      visualizations: MANIFESTS
+      dataCube: DataCubeFixtures.wiki()
     };
   }
 
   static getTwitterContext() {
     return {
-      dataCube: DataCubeFixtures.twitter(),
-      visualizations: MANIFESTS
+      dataCube: DataCubeFixtures.twitter()
     };
   }
 
@@ -103,8 +103,8 @@ export class EssenceFixtures {
     ];
     return new Essence({
       dataCube: DataCubeFixtures.wiki(),
-      visualizations: MANIFESTS,
       visualization: TABLE_MANIFEST,
+      visualizationSettings: TABLE_MANIFEST.visualizationSettings.defaults,
       timezone: Timezone.fromJS("Etc/UTC"),
       timeShift: TimeShift.empty(),
       filter: Filter.fromClauses(filterClauses),
@@ -112,8 +112,7 @@ export class EssenceFixtures {
       series: SeriesList.fromMeasureNames(["delta", "count", "added"]),
       pinnedDimensions: OrderedSet(["channel", "namespace", "isRobot"]),
       colors: null,
-      pinnedSort: "delta",
-      highlight: null
+      pinnedSort: "delta"
     });
   }
 
@@ -126,13 +125,10 @@ export class EssenceFixtures {
       stringSplitCombine("channel", { sort: { reference: "delta", direction: SortDirection.descending }, limit: 50 }),
       timeSplitCombine("time", "PT1H", { sort: { reference: "delta", direction: SortDirection.descending }, limit: null })
     ];
-    const highlightClauses = [
-      timeRange("time", new Date("2015-09-12T10:00:00Z"), new Date("2015-09-12T11:00:00Z"))
-    ];
     return new Essence({
       dataCube: DataCubeFixtures.wiki(),
-      visualizations: MANIFESTS,
       visualization: LINE_CHART_MANIFEST,
+      visualizationSettings: null,
       timezone: Timezone.fromJS("Etc/UTC"),
       timeShift: TimeShift.empty(),
       filter: Filter.fromClauses(filterClauses),
@@ -140,8 +136,7 @@ export class EssenceFixtures {
       series: SeriesList.fromMeasureNames(["delta", "count", "added"]),
       pinnedDimensions: OrderedSet(["channel", "namespace", "isRobot"]),
       colors: new Colors({ dimension: "channel", values: { 0: "no", 1: "sv", 3: "fr", 4: "cs", 5: "en" } }),
-      pinnedSort: "delta",
-      highlight: new Highlight({ measure: "count", delta: Filter.fromClauses(highlightClauses) })
+      pinnedSort: "delta"
     });
   }
 

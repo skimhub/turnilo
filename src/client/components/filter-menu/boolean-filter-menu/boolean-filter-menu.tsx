@@ -57,9 +57,9 @@ interface BooleanFilterMenuState {
 
 export class BooleanFilterMenu extends React.Component<BooleanFilterMenuProps, BooleanFilterMenuState> {
 
-  state = this.initState();
+  state = this.initialValues();
 
-  initState(): BooleanFilterMenuState {
+  initialValues(): BooleanFilterMenuState {
     const { essence: { filter }, dimension } = this.props;
     const clause = filter.getClauseForDimension(dimension);
     if (!clause) {
@@ -105,10 +105,11 @@ export class BooleanFilterMenu extends React.Component<BooleanFilterMenuProps, B
 
   }
 
-  constructFilter(): Filter {
-    const { essence: { filter }, dimension } = this.props;
+  constructFilter(): Filter | null {
     const { selectedValues } = this.state;
+    if (selectedValues.isEmpty()) return null;
 
+    const { essence: { filter }, dimension } = this.props;
     return filter.setClause(new BooleanFilterClause({
       reference: dimension.name,
       values: selectedValues
@@ -126,18 +127,18 @@ export class BooleanFilterMenu extends React.Component<BooleanFilterMenuProps, B
     const { clicker, onClose } = this.props;
     clicker.changeFilter(this.constructFilter());
     onClose();
-  }
+  };
 
   onCancelClick = () => {
     const { onClose } = this.props;
     onClose();
-  }
+  };
 
   selectValue = (value: Booleanish) => {
     const { selectedValues } = this.state;
     const newSelection = selectedValues.has(value) ? selectedValues.remove(value) : selectedValues.add(value);
     this.setState({ selectedValues: newSelection });
-  }
+  };
 
   renderRow = (value: Booleanish) => {
     const { selectedValues } = this.state;
@@ -151,7 +152,7 @@ export class BooleanFilterMenu extends React.Component<BooleanFilterMenuProps, B
         <span className="label">{value.toString()}</span>
       </div>
     </div>;
-  }
+  };
 
   render() {
     const { onClose, containerStage, openOn, inside } = this.props;

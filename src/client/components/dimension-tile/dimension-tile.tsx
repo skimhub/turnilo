@@ -23,7 +23,7 @@ import { Clicker } from "../../../common/models/clicker/clicker";
 import { Colors } from "../../../common/models/colors/colors";
 import { Dimension } from "../../../common/models/dimension/dimension";
 import { Essence } from "../../../common/models/essence/essence";
-import { isTimeFilter, NumberFilterClause, StringFilterAction, StringFilterClause } from "../../../common/models/filter-clause/filter-clause";
+import { BooleanFilterClause, isTimeFilter, NumberFilterClause, StringFilterAction, StringFilterClause } from "../../../common/models/filter-clause/filter-clause";
 import { clausePredicate } from "../../../common/models/filter-clause/filter-clause-predicate";
 import { Filter, FilterMode } from "../../../common/models/filter/filter";
 import {
@@ -384,7 +384,7 @@ export class DimensionTile extends React.Component<DimensionTileProps, Dimension
     unfolded = !unfolded;
     this.setState({ unfolded });
     this.fetchData(essence, timekeeper, dimension, sortOn, unfolded);
-  }
+  };
 
   onDragStart = (e: React.DragEvent<HTMLElement>) => {
     const { dimension } = this.props;
@@ -395,12 +395,12 @@ export class DimensionTile extends React.Component<DimensionTileProps, Dimension
 
     DragManager.setDragDimension(dimension);
     setDragGhost(dataTransfer, dimension.title);
-  }
+  };
 
   toggleSearch = () => {
     this.setState(({ showSearch }) => ({ showSearch: !showSearch }));
     this.onSearchChange("");
-  }
+  };
 
   onSearchChange = (text: string) => {
     const { searchText, dataset, fetchQueued, loading } = this.state;
@@ -421,7 +421,7 @@ export class DimensionTile extends React.Component<DimensionTileProps, Dimension
       fetchQueued: true
     });
     this.collectTriggerSearch();
-  }
+  };
 
   getTitleHeader(): string {
     const { dimension } = this.props;
@@ -508,8 +508,8 @@ export class DimensionTile extends React.Component<DimensionTileProps, Dimension
     const { searchText, filterMode } = this.state;
 
     const filterClause = filter.getClauseForDimension(dimension);
-    if (filterClause && !(filterClause instanceof StringFilterClause)) {
-      throw new Error(`Expected StringFilterClause, got: ${filterClause}`);
+    if (filterClause && !(filterClause instanceof StringFilterClause || filterClause instanceof BooleanFilterClause)) {
+      throw new Error(`Expected StringFilterClause or BooleanFilterClause, got: ${filterClause}`);
     }
     const colorValues = this.prepareColorValues(colors, dimension, rowData);
     const formatter = this.getFormatter();
@@ -660,7 +660,7 @@ export class DimensionTile extends React.Component<DimensionTileProps, Dimension
       </div>
       {foldControl}
       {error && <QueryError error={error} />}
-      {!sortOn && <Message content="No measure selected"/>}
+      {!sortOn && <Message content="No measure selected" />}
       {loading && <Loader />}
     </SearchableTile>;
   }
