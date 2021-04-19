@@ -16,7 +16,7 @@
 
 import * as React from "react";
 import { Essence } from "../../../../../common/models/essence/essence";
-import { Corner } from "../../utils/corner";
+import { Corner } from "../../../../components/tabular-scroller/corner/corner";
 
 interface CombinedSplitsTitle {
   essence: Essence;

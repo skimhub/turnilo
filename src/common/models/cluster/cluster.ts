@@ -18,7 +18,9 @@
 import { BackCompat, BaseImmutable, Property } from "immutable-class";
 import { External } from "plywood";
 import { URL } from "url";
-import { isTruthy, verifyUrlSafeName } from "../../utils/general/general";
+import { RequestDecorator, RequestDecoratorJS } from "../../../server/utils/request-decorator/request-decorator";
+import { RetryOptions } from "../../../server/utils/retry-options/retry-options";
+import { isNil, isTruthy, verifyUrlSafeName } from "../../utils/general/general";
 
 export type SourceListScan = "disable" | "auto";
 
@@ -37,8 +39,7 @@ export interface ClusterValue {
   guardDataCubes?: boolean;
 
   introspectionStrategy?: string;
-  requestDecorator?: string;
-  decoratorOptions?: any;
+  requestDecorator?: RequestDecorator;
 }
 
 export interface ClusterJS {
@@ -56,8 +57,7 @@ export interface ClusterJS {
   guardDataCubes?: boolean;
 
   introspectionStrategy?: string;
-  requestDecorator?: string;
-  decoratorOptions?: any;
+  requestDecorator?: RequestDecoratorJS;
 }
 
 function ensureNotNative(name: string): void {
@@ -86,7 +86,6 @@ function oldHostParameter(cluster: any): string {
 }
 
 export class Cluster extends BaseImmutable<ClusterValue, ClusterJS> {
-  static DEFAULT_TIMEOUT = 40000;
   static DEFAULT_HEALTH_CHECK_TIMEOUT = 1000;
   static DEFAULT_SOURCE_LIST_SCAN: SourceListScan = "auto";
   static SOURCE_LIST_SCAN_VALUES: SourceListScan[] = ["disable", "auto"];
@@ -115,7 +114,8 @@ export class Cluster extends BaseImmutable<ClusterValue, ClusterJS> {
     { name: "url", defaultValue: null, validate: [validateUrl] },
     { name: "title", defaultValue: "" },
     { name: "version", defaultValue: null },
-    { name: "timeout", defaultValue: Cluster.DEFAULT_TIMEOUT },
+    { name: "timeout", defaultValue: undefined },
+    { name: "retry", defaultValue: null, immutableClass: RetryOptions },
     { name: "healthCheckTimeout", defaultValue: Cluster.DEFAULT_HEALTH_CHECK_TIMEOUT },
     { name: "sourceListScan", defaultValue: Cluster.DEFAULT_SOURCE_LIST_SCAN, possibleValues: Cluster.SOURCE_LIST_SCAN_VALUES },
     { name: "sourceListRefreshOnLoad", defaultValue: Cluster.DEFAULT_SOURCE_LIST_REFRESH_ON_LOAD },
@@ -131,8 +131,7 @@ export class Cluster extends BaseImmutable<ClusterValue, ClusterJS> {
       validate: [BaseImmutable.ensure.number, ensureNotTiny]
     },
     { name: "introspectionStrategy", defaultValue: Cluster.DEFAULT_INTROSPECTION_STRATEGY },
-    { name: "requestDecorator", defaultValue: null },
-    { name: "decoratorOptions", defaultValue: null },
+    { name: "requestDecorator", defaultValue: null, immutableClass: RequestDecorator },
     { name: "guardDataCubes", defaultValue: Cluster.DEFAULT_GUARD_DATA_CUBES }
   ];
 
@@ -144,6 +143,15 @@ export class Cluster extends BaseImmutable<ClusterValue, ClusterJS> {
       const oldHost = oldHostParameter(cluster);
       cluster.url = Cluster.HTTP_PROTOCOL_TEST.test(oldHost) ? oldHost : `http://${oldHost}`;
     }
+  }, {
+    condition: cluster => typeof cluster.requestDecorator === "string" || !isNil(cluster.decoratorOptions),
+    action: cluster => {
+      console.warn(`Cluster ${cluster.name} : requestDecorator as string and decoratorOptions fields are deprecated. Use object with path and options fields`);
+      cluster.requestDecorator = {
+        path: cluster.requestDecorator,
+        options: cluster.decoratorOptions
+      };
+    }
   }];
 
   public type = "druid";
@@ -153,6 +161,7 @@ export class Cluster extends BaseImmutable<ClusterValue, ClusterJS> {
   public title: string;
   public version: string;
   public timeout: number;
+  public retry: RetryOptions;
   public healthCheckTimeout: number;
   public sourceListScan: SourceListScan;
   public sourceListRefreshOnLoad: boolean;
@@ -163,8 +172,7 @@ export class Cluster extends BaseImmutable<ClusterValue, ClusterJS> {
 
   // Druid
   public introspectionStrategy: string;
-  public requestDecorator: string;
-  public decoratorOptions: any;
+  public requestDecorator: RequestDecorator;
 
   public getTimeout: () => number;
   public getSourceListScan: () => SourceListScan;
