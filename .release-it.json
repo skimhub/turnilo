@@ -1,6 +1,11 @@
 {
-  "pkgFiles": [
-    "package.json",
-    "package-lock.json"
-  ]
+  "git": {
+    "requireCleanWorkingDir": false
+  },
+  "github": {
+    "release": true
+  },
+  "npm": {
+    "skipChecks": true
+  }
 }

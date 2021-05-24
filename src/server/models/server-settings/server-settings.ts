@@ -15,8 +15,8 @@
  * limitations under the License.
  */
 
-import { BackCompat, BaseImmutable } from "immutable-class";
-import { SettingsLocation } from "../settings-location/settings-location";
+import { BackCompat, BaseImmutable, Property, PropertyType } from "immutable-class";
+import { PluginSettings } from "../plugin-settings/plugin-settings";
 
 export type Iframe = "allow" | "deny";
 export type TrustProxy = "none" | "always";
@@ -26,15 +26,16 @@ export interface ServerSettingsValue {
   port?: number;
   serverHost?: string;
   serverRoot?: string;
+  serverTimeout?: number;
   readinessEndpoint?: string;
   livenessEndpoint?: string;
   requestLogFormat?: string;
   pageMustLoadTimeout?: number;
+  verbose?: boolean;
   iframe?: Iframe;
   trustProxy?: TrustProxy;
   strictTransportSecurity?: StrictTransportSecurity;
-  auth?: string;
-  settingsLocation?: SettingsLocation;
+  plugins?: PluginSettings[];
 }
 
 export interface ServerSettingsJS extends ServerSettingsValue {
@@ -46,6 +47,7 @@ export class ServerSettings extends BaseImmutable<ServerSettingsValue, ServerSet
   static DEFAULT_SERVER_ROOT = "";
   static DEFAULT_READINESS_ENDPOINT = "/health/ready";
   static DEFAULT_LIVENESS_ENDPOINT = "/health/alive";
+  static DEFAULT_SERVER_TIMEOUT = 0;
   static DEFAULT_REQUEST_LOG_FORMAT = "common";
   static DEFAULT_PAGE_MUST_LOAD_TIMEOUT = 800;
   static IFRAME_VALUES: Iframe[] = ["allow", "deny"];
@@ -61,23 +63,24 @@ export class ServerSettings extends BaseImmutable<ServerSettingsValue, ServerSet
   }
 
   // TODO, back to: static PROPERTIES: Property[] = [
-  static PROPERTIES: any[] = [
+  static PROPERTIES: Property[] = [
     { name: "port", defaultValue: ServerSettings.DEFAULT_PORT, validate: BaseImmutable.ensure.number },
     { name: "serverHost", defaultValue: null },
     { name: "serverRoot", defaultValue: ServerSettings.DEFAULT_SERVER_ROOT },
+    { name: "serverTimeout", defaultValue: ServerSettings.DEFAULT_SERVER_TIMEOUT },
     { name: "readinessEndpoint", defaultValue: ServerSettings.DEFAULT_READINESS_ENDPOINT },
     { name: "livenessEndpoint", defaultValue: ServerSettings.DEFAULT_LIVENESS_ENDPOINT },
     { name: "requestLogFormat", defaultValue: ServerSettings.DEFAULT_REQUEST_LOG_FORMAT },
     { name: "pageMustLoadTimeout", defaultValue: ServerSettings.DEFAULT_PAGE_MUST_LOAD_TIMEOUT },
     { name: "iframe", defaultValue: ServerSettings.DEFAULT_IFRAME, possibleValues: ServerSettings.IFRAME_VALUES },
+    { name: "verbose", defaultValue: false, possibleValues: [false, true] },
     { name: "trustProxy", defaultValue: ServerSettings.DEFAULT_TRUST_PROXY, possibleValues: ServerSettings.TRUST_PROXY_VALUES },
     {
       name: "strictTransportSecurity",
       defaultValue: ServerSettings.DEFAULT_STRICT_TRANSPORT_SECURITY,
       possibleValues: ServerSettings.STRICT_TRANSPORT_SECURITY_VALUES
     },
-    { name: "auth", defaultValue: null },
-    { name: "settingsLocation", defaultValue: null, immutableClass: SettingsLocation }
+    { name: "plugins", defaultValue: [], type: PropertyType.ARRAY, immutableClassArray: PluginSettings }
   ];
 
   static BACK_COMPATS: BackCompat[] = [{
@@ -91,15 +94,16 @@ export class ServerSettings extends BaseImmutable<ServerSettingsValue, ServerSet
   public port: number;
   public serverHost: string;
   public serverRoot: string;
+  public serverTimeout: string;
   public readinessEndpoint: string;
   public livenessEndpoint: string;
   public requestLogFormat: string;
   public pageMustLoadTimeout: number;
   public iframe: Iframe;
+  public verbose: boolean;
   public trustProxy: TrustProxy;
   public strictTransportSecurity: StrictTransportSecurity;
-  public auth: string;
-  public settingsLocation: SettingsLocation;
+  public plugins: PluginSettings[];
 
   constructor(parameters: ServerSettingsValue) {
     super(parameters);
@@ -108,13 +112,14 @@ export class ServerSettings extends BaseImmutable<ServerSettingsValue, ServerSet
   public getPort: () => number;
   public getServerHost: () => string;
   public getServerRoot: () => string;
+  public getServerTimeout: () => number;
   public getReadinessEndpoint: () => string;
   public getLivenessEndpoint: () => string;
   public getPageMustLoadTimeout: () => number;
   public getIframe: () => Iframe;
   public getTrustProxy: () => TrustProxy;
   public getStrictTransportSecurity: () => StrictTransportSecurity;
-  public getSettingsLocation: () => SettingsLocation;
+  public getPlugins: () => PluginSettings[];
 }
 
 BaseImmutable.finalize(ServerSettings);

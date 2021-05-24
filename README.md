@@ -1,9 +1,9 @@
 # Turnilo
 
 [![npm version](https://img.shields.io/npm/v/turnilo.svg)](https://www.npmjs.org/package/turnilo)
-[![build status](https://travis-ci.org/allegro/turnilo.svg?branch=master)](https://travis-ci.org/allegro/turnilo)
+[![build status](https://github.com/allegro/turnilo/workflows/Build/badge.svg)](https://github.com/allegro/turnilo/actions)
 
-Turnilo is a business intelligence, data exploration and visualization web application for [Druid](http://druid.io/).
+Turnilo is a business intelligence, data exploration and visualization web application for [Apache Druid](https://druid.apache.org).
 Turnilo is a fork of [Pivot](https://github.com/implydata/pivot) which is currently available under commercial licence only.
 This repository was forked from the stalled repository [Swiv](https://github.com/yahoo/swiv) 
 with the latest version of Pivot under Apache license.
@@ -28,23 +28,28 @@ this is how Turnilo emerged.
 
 ## Features
 
-* Intuitive, drag and drop, gorgeous user interface to visualize Druid datasets
+* Intuitive, drag and drop, gorgeous user interface to visualize Druid datasets.
 * Fully dedicated to low latency Druid 
-[Timeseries](http://druid.io/docs/latest/querying/timeseriesquery.html), 
-[TopN](http://druid.io/docs/latest/querying/topnquery.html) and 
-[GroupBy](http://druid.io/docs/latest/querying/groupbyquery.html) queries.
-* Unified view for historical and real-time data
-* Blazingly fast
+[Timeseries](https://druid.apache.org/docs/latest/querying/timeseriesquery.html), 
+[TopN](https://druid.apache.org/docs/latest/querying/topnquery.html) and 
+[GroupBy](https://druid.apache.org/docs/latest/querying/groupbyquery.html) queries.
+* Unified view for historical and real-time data.
+* Blazingly fast.
 
 ![Turnilo UI](https://github.com/allegro/turnilo/raw/master/docs/images/showcase.gif)
 
+## Try it!
+
+You can try an online demo with example datasets (Covid-19 and Wikipedia) at [https://turnilo.app](https://turnilo.app).
+
 ## Join us!
 
-[Join the chat on Slack](https://join.slack.com/t/turnilo/shared_invite/enQtOTI4ODcxMjcyNjU2LTFlOTk5YWZlOGMyZDZhZWU3MGNjNDRhZmI1Y2UzNDlkZmY3YzYxYTJhYzIzMzc0MTc3MzA3OTE1NmQ5NDI1M2I)
+Feel free to ask on [GitHub Discussions](https://github.com/allegro/turnilo/discussions)
+or join the chat on [Slack](https://join.slack.com/t/turnilo/shared_invite/enQtOTI4ODcxMjcyNjU2LTFlOTk5YWZlOGMyZDZhZWU3MGNjNDRhZmI1Y2UzNDlkZmY3YzYxYTJhYzIzMzc0MTc3MzA3OTE1NmQ5NDI1M2I).
 
 ## Pre-requisites
 
-* [Node.js](https://nodejs.org/) - 12.x or 10.x version.
+* [Node.js](https://nodejs.org/) - 12.x or 14.x version
 
 :warning:
 Do not use `yarn` command for dependency management and project build, use `npm` instead.
@@ -58,7 +63,7 @@ Install Turnilo distribution using [npm](https://www.npmjs.com/).
 npm install -g turnilo
 ```
 
-Start off by running an example with Wikipedia page editions dataset 
+Start off by running an example with Covid-19 and Wikipedia datasets
 and open [http://localhost:9090/](http://localhost:9090/).
 
 ```
@@ -74,28 +79,51 @@ turnilo --druid http[s]://druid-broker-hostname[:port]
 
 ## Documentation
 
-* [Configuration](docs/configuration.md)
-* [Generating Links](docs/generating-links.md)
-* [Health checking](docs/health-checking.md)
+Learn how to configure and customize Turnilo:
+[https://allegro.github.io/turnilo/](https://allegro.github.io/turnilo/)
 
 ## Development
 
-Install project dependencies.
+### Install project dependencies.
 
 ```
 npm install
 ```
 
-Build the project.
+### Build the project.
 
 ```
-npm run build:dev
+npm run build
 ```
 
-Run Wikipedia examples.
+### Run project
+
+Run Covid-19 and Wikipedia examples.
 
 ```
-npm run start:dev -- --examples
+npm run start:examples
+```
+
+Connect to the existing Druid broker.
+
+```
+npm run start -- --druid http[s]://druid-broker-hostname[:port]
+```
+
+Connect to the existing Druid broker using your config file.
+
+```
+npm run start -- --config path/to/config.yml
+```
+
+### Run project in developer mode
+
+Every change in frontend code would recompile project and reload page.
+
+Run Covid-19 and Wikipedia examples.
+
+```
+npm run start:dev:examples
 ```
 
 Connect to the existing Druid broker.
@@ -104,7 +132,16 @@ Connect to the existing Druid broker.
 npm run start:dev -- --druid http[s]://druid-broker-hostname[:port]
 ```
 
-### Testing
+Connect to the existing Druid broker using your config file.
+
+```
+npm run start:dev -- --config path/to/config.yml
+```
+
+
+## Testing
+
+### Unit tests
 
 Run all unit tests.
 
@@ -120,14 +157,30 @@ npm run test:client
 npm run test:server
 ```
 
+### End to end tests
+
+Run all e2e tests. It will start Turnilo with example datasets in background.
+
+```
+npm run e2e
+```
+
+### End to end tests development
+
+Run server
+
+```
+npm start:dev:examples
+```
+
+Run cypress interactive tools for e2e testing
+
+```
+npm run e2e:dev
+```
+
+
 ## Debugging 
-
-### Client module
-
-In WebStorm\IntelliJ open "Run/Debug Configurations", click "Add New Configuration".
-Next choose "JavaScript Debug" and set URL property to "localhost:9090".
-
-You can find more information [here](https://www.jetbrains.com/help/webstorm/debugging-typescript.html)
 
 ### Server module
 
@@ -136,7 +189,33 @@ Next choose "Node.JS", set "JavaScript file" to "./bin/turnilo"
 and "Application parameters" to "--examples".
 
 You can find more infrmation [here](https://www.jetbrains.com/help/webstorm/running-and-debugging-node-js.html)
- 
+
+## Generating documentation locally
+
+### Prerequisites
+
+* [Ruby](https://www.ruby-lang.org/en/documentation/installation/)
+* [Bundler](https://bundler.io)
+
+Go to docs directory.
+
+```
+cd docs
+```
+
+Install dependencies.
+
+```
+bundle install 
+```
+
+Run your Jekyll site locally and open [http://localhost:4000/](http://localhost:4000/)
+
+```
+bundle exec jekyll serve --incremental
+```
+
+
 ## License
 
 **Turnilo** is published under [Apache License 2.0](http://www.apache.org/licenses/LICENSE-2.0).

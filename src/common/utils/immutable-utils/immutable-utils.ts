@@ -16,6 +16,7 @@
  */
 import { Record } from "immutable";
 import { Equalable } from "immutable-class";
+import { isObject } from "../general/general";
 
 export class ImmutableUtils {
   public static setProperty(instance: any, path: string, newValue: any): any {
@@ -85,5 +86,10 @@ export class ImmutableUtils {
 export type ImmutableRecord<T> = Record<T> & Readonly<T>;
 
 export function isEqualable(o: unknown): o is Equalable {
-  return typeof o === "object" && typeof (o as Equalable).equals === "function";
+  return isObject(o) && typeof (o as Equalable).equals === "function";
+}
+
+export function safeEquals(a: unknown, b: unknown): boolean {
+  if (isEqualable(a)) return a.equals(b);
+  return a === b;
 }
