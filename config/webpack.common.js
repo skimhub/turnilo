@@ -16,27 +16,37 @@
 
 const path = require("path");
 
-const babelLoader = {
-  loader: "babel-loader",
-  options: {
-    presets: [
-      ["@babel/preset-env", {
-        modules: false
-      }]
+const MiniCssExtractPlugin = require("mini-css-extract-plugin");
+const { IgnorePlugin } = require('webpack');
+
+const toTranspilePattern = {
+  test: /\.[jt]sx?$/,
+  exclude: {
+    and: [/node_modules/],
+    not: [
+      /* List of node modules to transpile */
+      /react-syntax-highlighter/ // imported from "react-syntax-highlighter/src"
     ]
   }
-};
+}
 
-module.exports = {
+const config = {
   devtool: "source-map",
   output: {
     path: path.resolve(__dirname, '../build/public'),
-    filename: "main.js",
+    filename: "[name].js",
     chunkFilename: "[name].[hash].js"
   },
   resolve: {
     extensions: [".ts", ".tsx", ".js", ".json"]
   },
+  plugins: [
+    new MiniCssExtractPlugin(),
+    new IgnorePlugin({
+      resourceRegExp: /^\.\/locale$/,
+      contextRegExp: /moment$/,
+    }),
+  ],
   module: {
     rules: [
       {
@@ -45,37 +55,32 @@ module.exports = {
         use: ["source-map-loader"]
       },
       {
-        test: /\.js?$/,
-        use: [
-          babelLoader
-        ]
-      },
-      {
-        test: /\.tsx?$/,
-        use: [
-          babelLoader,
-          {
-            loader: "ts-loader",
-            options: {
-              configFile: "src/client/tsconfig.json"
-            }
+        ...toTranspilePattern,
+        use: [{
+          loader: "babel-loader",
+          options: {
+            envName: "modern"
           }
-        ]
+        }]
       },
       {
         test: /\.css$/,
         use: [
-          "style-loader",
+          MiniCssExtractPlugin.loader,
           "css-loader"
         ]
       },
       {
         test: /\.scss$/,
         use: [
-          "style-loader",
+          MiniCssExtractPlugin.loader,
           "css-loader",
           "sass-loader"
         ]
+      },
+      {
+        test: /\.(woff|woff2)$/i,
+        loader: "file-loader",
       },
       {
         test: /\.svg$/,
@@ -84,3 +89,6 @@ module.exports = {
     ]
   }
 };
+
+module.exports.config = config;
+module.exports.toTranspilePattern = toTranspilePattern;

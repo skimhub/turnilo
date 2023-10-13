@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-import * as React from "react";
+import React from "react";
 import { ConcreteSeries, SeriesDerivation } from "../../../../../common/models/series/concrete-series";
 import { SeriesSort, Sort, SortDirection } from "../../../../../common/models/sort/sort";
 import { MeasureHeaderCell } from "./measure-header-cell";
@@ -22,7 +22,7 @@ import { MeasureHeaderCell } from "./measure-header-cell";
 interface MeasuresHeaderProps {
   cellWidth: number;
   series: ConcreteSeries[];
-  commonSort: Sort;
+  sort: Sort;
   showPrevious: boolean;
 }
 
@@ -31,8 +31,8 @@ function sortDirection(commonSort: Sort, series: ConcreteSeries, period = Series
   return isSortedBy ? commonSort.direction : null;
 }
 
-export const MeasuresHeader: React.SFC<MeasuresHeaderProps> = props => {
-  const { cellWidth, series, commonSort, showPrevious } = props;
+export const MeasuresHeader: React.FunctionComponent<MeasuresHeaderProps> = props => {
+  const { cellWidth, series, sort, showPrevious } = props;
 
   return <React.Fragment>
     {series.map(serie => {
@@ -40,25 +40,25 @@ export const MeasuresHeader: React.SFC<MeasuresHeaderProps> = props => {
         key={serie.reactKey()}
         width={cellWidth}
         title={serie.title()}
-        sort={sortDirection(commonSort, serie)} />;
+        sort={sortDirection(sort, serie)} />;
 
       if (!showPrevious) {
         return currentMeasure;
       }
 
-      return <React.Fragment>
+      return <React.Fragment key={serie.reactKey()}>
         {currentMeasure}
         <MeasureHeaderCell
           key={serie.reactKey(SeriesDerivation.PREVIOUS)}
           width={cellWidth}
           title={serie.title(SeriesDerivation.PREVIOUS)}
-          sort={sortDirection(commonSort, serie, SeriesDerivation.PREVIOUS)} />
+          sort={sortDirection(sort, serie, SeriesDerivation.PREVIOUS)} />
         <MeasureHeaderCell
           className="measure-delta"
           key={serie.reactKey(SeriesDerivation.DELTA)}
           width={cellWidth}
           title="Difference"
-          sort={sortDirection(commonSort, serie, SeriesDerivation.DELTA)} />
+          sort={sortDirection(sort, serie, SeriesDerivation.DELTA)} />
       </React.Fragment>;
     })}
   </React.Fragment>;

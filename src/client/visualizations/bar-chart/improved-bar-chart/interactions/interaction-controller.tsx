@@ -15,8 +15,8 @@
  */
 
 import { List } from "immutable";
-import { Datum, TimeRange } from "plywood";
-import * as React from "react";
+import { Datum, Range, TimeRange } from "plywood";
+import React from "react";
 import { DateRange } from "../../../../../common/models/date-range/date-range";
 import { FilterClause, FixedTimeFilterClause } from "../../../../../common/models/filter-clause/filter-clause";
 import { ConcreteSeries } from "../../../../../common/models/series/concrete-series";
@@ -24,7 +24,7 @@ import { Binary, Unary } from "../../../../../common/utils/functional/functional
 import { safeEquals } from "../../../../../common/utils/immutable-utils/immutable-utils";
 import { ScrollerPart } from "../../../../components/scroller/scroller";
 import { toPlywoodRange } from "../../../../utils/highlight-clause/highlight-clause";
-import { Highlight } from "../../../base-visualization/highlight";
+import { Highlight } from "../../../highlight-controller/highlight";
 import { BarChartModel } from "../utils/bar-chart-model";
 import { BarChartLayout } from "../utils/layout";
 import { DomainValue } from "../utils/x-domain";
@@ -73,8 +73,9 @@ export class InteractionController extends React.Component<InteractionController
     const { highlight } = this.props;
     if (highlight) return;
     const value = this.getValueFromEvent(x, part);
-    if (!TimeRange.isTimeRange(value)) return;
+    if (!Range.isRange(value)) return;
     const series = this.getSeriesFromEvent(y, part);
+    if (series === null) return;
     const datum = this.findDatumByValue(value);
     const hover = createHover(series.plywoodKey(), datum);
     const { hover: oldHover } = this.state;
@@ -94,6 +95,7 @@ export class InteractionController extends React.Component<InteractionController
     if (!TimeRange.isTimeRange(value)) return;
     this.setState({ hover: null });
     const series = this.getSeriesFromEvent(y, part);
+    if (series === null) return;
     const { saveHighlight, model } = this.props;
     const { reference } = model.continuousSplit;
     const values = List.of(new DateRange(value));
@@ -108,16 +110,15 @@ export class InteractionController extends React.Component<InteractionController
   }
 
   findDatumByValue(value: DomainValue): Datum | null {
-    const { model, datums } = this.props;
-    const { reference } = model.continuousSplit;
-    return datums.find(datum => safeEquals(value, datum[reference]));
+    const { model: { continuousSplit }, datums } = this.props;
+    return datums.find(datum => safeEquals(value, continuousSplit.selectValue(datum)));
   }
 
   getSeriesFromEvent(y: number, part: ScrollerPart): ConcreteSeries | null {
     if (part !== "body") return null;
     const { layout: { segment: { height: seriesHeight } }, model: { series } } = this.props;
     const index = Math.floor(y / seriesHeight);
-    return series.get(index);
+    return series.get(index) || null;
   }
 
   interaction(): Interaction | null {

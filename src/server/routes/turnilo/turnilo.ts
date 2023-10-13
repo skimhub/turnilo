@@ -16,25 +16,22 @@
  */
 
 import { Request, Response, Router } from "express";
-import { SETTINGS_MANAGER } from "../../config";
-import { checkAccess } from "../../utils/datacube-guard/datacube-guard";
-import { SettingsGetter } from "../../utils/settings-manager/settings-manager";
+import { getTitle } from "../../../common/models/customization/customization";
+import { SettingsManager } from "../../utils/settings-manager/settings-manager";
 import { mainLayout } from "../../views";
 
-export function turniloRouter(settingsGetter: SettingsGetter, version: string) {
+export function turniloRouter(settings: Pick<SettingsManager, "appSettings" | "getTimekeeper">, version: string) {
+  const appSettings = settings.appSettings;
 
   const router = Router();
 
   router.get("/", async (req: Request, res: Response) => {
     try {
-      const settings = await settingsGetter();
-      const clientSettings = settings.toClientSettings();
-      clientSettings.dataCubes = clientSettings.dataCubes.filter( dataCube => checkAccess(dataCube, req.headers) );
       res.send(mainLayout({
         version,
-        title: settings.customization.getTitle(version),
-        appSettings: clientSettings,
-        timekeeper: SETTINGS_MANAGER.getTimekeeper()
+        title: getTitle(appSettings.customization, version),
+        appSettings,
+        timekeeper: settings.getTimekeeper()
       }));
     } catch (e) {
       res.status(400).send({ error: "Couldn't load Turnilo Application" });

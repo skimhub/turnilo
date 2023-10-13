@@ -17,9 +17,9 @@
 
 import { Duration, Timezone } from "chronoshift";
 import { immutableEqual } from "immutable-class";
-import * as React from "react";
+import React from "react";
 import { Clicker } from "../../../../common/models/clicker/clicker";
-import { Customization } from "../../../../common/models/customization/customization";
+import { ClientCustomization } from "../../../../common/models/customization/customization";
 import { Essence } from "../../../../common/models/essence/essence";
 import { Timekeeper } from "../../../../common/models/timekeeper/timekeeper";
 import { Binary } from "../../../../common/utils/functional/functional";
@@ -31,7 +31,6 @@ import { ShareMenu } from "../../../components/share-menu/share-menu";
 import { SvgIcon } from "../../../components/svg-icon/svg-icon";
 import { TimezoneMenu } from "../../../components/timezone-menu/timezone-menu";
 import { classNames } from "../../../utils/dom/dom";
-import { DataSetWithTabOptions } from "../cube-view";
 import "./cube-header-bar.scss";
 
 export interface CubeHeaderBarProps {
@@ -46,8 +45,7 @@ export interface CubeHeaderBarProps {
   openViewDefinitionModal?: Fn;
   openDruidQueryModal?: Fn;
   openUrlShortenerModal?: Binary<string, string, void>;
-  customization?: Customization;
-  getDownloadableDataset?: () => DataSetWithTabOptions;
+  customization?: ClientCustomization;
   changeTimezone?: (timezone: Timezone) => void;
 }
 
@@ -77,7 +75,7 @@ export class CubeHeaderBar extends React.Component<CubeHeaderBarProps, CubeHeade
     this.mounted = true;
   }
 
-  componentWillReceiveProps(nextProps: CubeHeaderBarProps) {
+  UNSAFE_componentWillReceiveProps(nextProps: CubeHeaderBarProps) {
     if (!this.props.updatingMaxTime && nextProps.updatingMaxTime) {
       this.setState({ animating: true });
       setTimeout(() => {
@@ -128,7 +126,7 @@ export class CubeHeaderBar extends React.Component<CubeHeaderBarProps, CubeHeade
   closeShareMenu = () => this.setState({ shareMenuAnchor: null });
 
   renderShareMenu() {
-    const { customization, essence, timekeeper, openUrlShortenerModal, urlForEssence, getDownloadableDataset } = this.props;
+    const { customization, essence, timekeeper, openUrlShortenerModal, urlForEssence } = this.props;
     const { shareMenuAnchor } = this.state;
     if (!shareMenuAnchor) return null;
 
@@ -140,7 +138,6 @@ export class CubeHeaderBar extends React.Component<CubeHeaderBarProps, CubeHeade
       onClose={this.closeShareMenu}
       customization={customization}
       urlForEssence={urlForEssence}
-      getDownloadableDataset={getDownloadableDataset}
     />;
   }
 
@@ -186,7 +183,7 @@ export class CubeHeaderBar extends React.Component<CubeHeaderBarProps, CubeHeade
 
     return <TimezoneMenu
       timezone={timezone}
-      timezones={customization.getTimezones()}
+      timezones={customization.timezones}
       changeTimezone={changeTimezone}
       openOn={timezoneMenuAnchor}
       onClose={this.closeTimezoneMenu}
@@ -260,7 +257,11 @@ export class CubeHeaderBar extends React.Component<CubeHeaderBarProps, CubeHeade
         <SvgIcon svg={require("../../../icons/menu.svg")} />
       </div>
       <div className="title" onClick={onNavClick}>{dataCube.title}</div>
-      {dataCube.description && <InfoBubble className="cube-description" description={dataCube.description} />}
+      {dataCube.description && <InfoBubble
+        className="cube-description"
+        description={dataCube.description}
+        extendedDescription={dataCube.extendedDescription}
+      />}
     </div>;
   }
 }

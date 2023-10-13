@@ -14,31 +14,38 @@
  * limitations under the License.
  */
 
-import { SeriesSort } from "../../models/sort/sort";
+import { findDimensionByName } from "../../models/dimension/dimensions";
 import { Resolve, VisualizationManifest } from "../../models/visualization-manifest/visualization-manifest";
 import { emptySettingsConfig } from "../../models/visualization-settings/empty-settings-config";
-import { isFiniteNumber } from "../../utils/general/general";
+import { thread } from "../../utils/functional/functional";
 import { Actions } from "../../utils/rules/actions";
 import { Predicates } from "../../utils/rules/predicates";
+import { adjustFiniteLimit, adjustSort } from "../../utils/rules/split-adjustments";
 import { visualizationDependentEvaluatorBuilder } from "../../utils/rules/visualization-dependent-evaluator";
+
+export const GRID_LIMITS = [50, 100, 200, 500, 1000, 10000];
 
 const rulesEvaluator = visualizationDependentEvaluatorBuilder
   .when(Predicates.noSplits())
   .then(Actions.manualDimensionSelection("The Grid requires at least one split"))
 
-  .otherwise(({ isSelectedVisualization, splits, series }) => {
-    const firstSeries = series.series.first();
-    const { limit: firstLimit, sort: firstSort } = splits.getSplit(0);
-    const safeFirstLimit = isFiniteNumber(firstLimit) ? firstLimit : 50;
-    const sort = firstSort instanceof SeriesSort
-      ? firstSort
-      : new SeriesSort({ reference: firstSeries.reference });
-    const newSplits = splits.update("splits", splits =>
-      splits.map(split =>
-        split.changeLimit(safeFirstLimit).changeSort(sort)));
+  .when(Predicates.noSelectedMeasures())
+  .then(Actions.manualMeasuresSelection())
+
+  .otherwise(({ isSelectedVisualization, series, dataCube, splits }) => {
+    const firstSplit = splits.getSplit(0);
+
+    const splitReferences = splits.splits.toArray().map(split => split.reference);
+    const dimension = findDimensionByName(dataCube.dimensions, firstSplit.reference);
+    const fixedFirstSplit = thread(
+      firstSplit,
+      adjustFiniteLimit(GRID_LIMITS),
+      adjustSort(dimension, series, splitReferences)
+    );
+    const newSplits = splits.replace(firstSplit, fixedFirstSplit);
 
     if (splits.equals(newSplits)) {
-      return Resolve.ready(isSelectedVisualization ? 10 : 4);
+      return Resolve.ready(isSelectedVisualization ? 10 : 6);
     }
     return Resolve.automatic(6, { splits: newSplits });
   })
@@ -46,7 +53,7 @@ const rulesEvaluator = visualizationDependentEvaluatorBuilder
 
 export const GRID_MANIFEST = new VisualizationManifest(
   "grid",
-  "[BETA] Grid",
+  "Grid",
   rulesEvaluator,
   emptySettingsConfig
 );

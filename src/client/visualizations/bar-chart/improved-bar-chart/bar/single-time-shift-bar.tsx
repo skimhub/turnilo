@@ -15,10 +15,12 @@
  */
 
 import { Datum } from "plywood";
-import * as React from "react";
+import React from "react";
+import { alphaMain } from "../../../../../common/models/colors/colors";
 import { ConcreteSeries, SeriesDerivation } from "../../../../../common/models/series/concrete-series";
-import { Unary } from "../../../../../common/utils/functional/functional";
 import { LinearScale } from "../../../../utils/linear-scale/linear-scale";
+import { useSettingsContext } from "../../../../views/cube-view/settings-context";
+import { BaseBarChartModel } from "../utils/bar-chart-model";
 import { DomainValue } from "../utils/x-domain";
 import { XScale } from "../utils/x-scale";
 import { SIDE_PADDING } from "./padding";
@@ -28,15 +30,16 @@ interface SingleTimeShiftBar {
   yScale: LinearScale;
   xScale: XScale;
   series: ConcreteSeries;
-  getX: Unary<Datum, DomainValue>;
+  model: BaseBarChartModel;
 }
 
-export const SingleTimeShiftBar: React.SFC<SingleTimeShiftBar> = props => {
-  const { datum, xScale, yScale, getX, series } = props;
+export const SingleTimeShiftBar: React.FunctionComponent<SingleTimeShiftBar> = props => {
+  const { customization: { visualizationColors } } = useSettingsContext();
+  const { datum, xScale, yScale, model: { continuousSplit }, series } = props;
   const [maxHeight] = yScale.range();
-  const x = getX(datum);
+  const x = continuousSplit.selectValue<DomainValue>(datum);
   const xStart = xScale.calculate(x);
-  const rangeBand = xScale.rangeBand();
+  const rangeBand = xScale.bandwidth();
   const fullWidth = rangeBand - 2 * SIDE_PADDING;
   const barWidth = fullWidth * 2 / 3;
 
@@ -45,17 +48,22 @@ export const SingleTimeShiftBar: React.SFC<SingleTimeShiftBar> = props => {
   const yCurrentStart = yScale(yCurrent);
   const yPreviousStart = yScale(yPrevious);
 
+  const currentFill = visualizationColors.main;
+  const previousFill = alphaMain(visualizationColors);
+
   return <React.Fragment>
     <rect
       className="bar-chart-bar-previous"
       x={xStart + rangeBand - SIDE_PADDING - barWidth}
       y={yPreviousStart}
+      fill={previousFill}
       width={barWidth}
       height={maxHeight - yPreviousStart} />
     <rect
       className="bar-chart-bar"
       x={xStart + SIDE_PADDING}
       y={yCurrentStart}
+      fill={currentFill}
       width={barWidth}
       height={maxHeight - yCurrentStart} />
   </React.Fragment>;

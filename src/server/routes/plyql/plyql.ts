@@ -17,7 +17,9 @@
 
 import { Request, Response, Router } from "express";
 import { $, Dataset, Expression, RefExpression } from "plywood";
-import { GetSettingsOptions, SettingsGetter } from "../../utils/settings-manager/settings-manager";
+import { isQueryable } from "../../../common/models/data-cube/queryable-data-cube";
+import { getDataCube } from "../../../common/models/sources/sources";
+import { SettingsManager } from "../../utils/settings-manager/settings-manager";
 
 interface PlyqlOutputFunctions {
   [key: string]: (data: Dataset) => string;
@@ -33,7 +35,7 @@ const outputFunctions: PlyqlOutputFunctions = {
   tsv: (data: Dataset): string => data.toTSV()
 };
 
-export function plyqlRouter(settingsGetter: SettingsGetter) {
+export function plyqlRouter(settings: Pick<SettingsManager, "getSources">) {
 
   const router = Router();
 
@@ -60,7 +62,7 @@ export function plyqlRouter(settingsGetter: SettingsGetter) {
 
     const outputFn = outputFunctions[outputType];
     if (outputFn === undefined) {
-      res.status(400).send("Invalid output type: " + outputType);
+      res.status(400).send("Invalid output type");
       return;
     }
 
@@ -79,13 +81,19 @@ export function plyqlRouter(settingsGetter: SettingsGetter) {
     });
 
     try {
-      const settings = await settingsGetter();
-      const myDataCube = settings.getDataCube(dataCube);
+      const sources = await settings.getSources();
+      const myDataCube = getDataCube(sources, dataCube);
 
       if (!myDataCube) {
         res.status(400).send({ error: "unknown data cube" });
         return;
       }
+
+      if (!isQueryable(myDataCube)) {
+        res.status(400).send({ error: "un queryable data cube" });
+        return;
+      }
+
       const data: Dataset = await myDataCube.executor(parsedQuery) as Dataset;
       res.type(outputType);
       res.send(outputFn(Dataset.fromJS(data.toJS())));

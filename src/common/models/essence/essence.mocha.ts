@@ -18,12 +18,12 @@
 import { expect } from "chai";
 import { SinonSpy, spy, stub } from "sinon";
 import { BAR_CHART_MANIFEST } from "../../visualization-manifests/bar-chart/bar-chart";
+import { GRID_MANIFEST } from "../../visualization-manifests/grid/grid";
 import { LINE_CHART_MANIFEST } from "../../visualization-manifests/line-chart/line-chart";
 import { TABLE_MANIFEST } from "../../visualization-manifests/table/table";
 import { TOTALS_MANIFEST } from "../../visualization-manifests/totals/totals";
-import { DataCube, Introspection } from "../data-cube/data-cube";
-import { DataCubeFixtures } from "../data-cube/data-cube.fixtures";
-import { DimensionKind } from "../dimension/dimension";
+import { clientAppSettings } from "../app-settings/app-settings.fixtures";
+import { twitterClientDataCube } from "../data-cube/data-cube.fixtures";
 import { TimeFilterPeriod } from "../filter-clause/filter-clause";
 import { timePeriod } from "../filter-clause/filter-clause.fixtures";
 import { Filter } from "../filter/filter";
@@ -34,54 +34,16 @@ import { DimensionSort, SortDirection } from "../sort/sort";
 import { Split, SplitType } from "../split/split";
 import { Splits } from "../splits/splits";
 import { TimeShift } from "../time-shift/time-shift";
+import { VisualizationManifest } from "../visualization-manifest/visualization-manifest";
 import { Essence, VisStrategy } from "./essence";
 import { EssenceFixtures } from "./essence.fixtures";
 
 describe("EssenceProps", () => {
-  var dataCubeJS = {
-    name: "twitter",
-    title: "Twitter",
-    clusterName: "druid",
-    source: "twitter",
-    introspection: ("none" as Introspection),
-    dimensions: [
-      {
-        kind: "time" as DimensionKind,
-        name: "time",
-        title: "Time",
-        formula: "$time"
-      },
-      {
-        kind: "string" as DimensionKind,
-        name: "twitterHandle",
-        title: "Twitter Handle",
-        formula: "$twitterHandle"
-      }
-    ],
-    measures: [
-      {
-        name: "count",
-        title: "count",
-        formula: "$main.count()"
-      }
-    ],
-    timeAttribute: "time",
-    defaultTimezone: "Etc/UTC",
-    defaultSplits: "time",
-    defaultDuration: "P3D",
-    defaultSortMeasure: "count",
-    defaultPinnedDimensions: ["twitterHandle"],
-    refreshRule: {
-      rule: "fixed",
-      time: new Date("2015-09-13T00:00:00Z")
-    }
-  };
-
-  const dataCube = DataCube.fromJS(dataCubeJS);
+  const dataCube = twitterClientDataCube;
 
   describe(".fromDataCube", () => {
     it.skip("works in the base case", () => {
-      const essence = Essence.fromDataCube(dataCube);
+      const essence = Essence.fromDataCube(dataCube, clientAppSettings);
 
       // TODO: don't test toJS
       expect(essence.toJS()).to.deep.equal({
@@ -139,7 +101,7 @@ describe("EssenceProps", () => {
   describe("vis picking", () => {
 
     describe("#getBestVisualization", () => {
-      const series = ["count"];
+      const series = [new MeasureSeries({ reference: "count" })];
       const tests = [
         {
           splits: [],
@@ -166,7 +128,7 @@ describe("EssenceProps", () => {
             sort: new DimensionSort({ reference: "twitterHandle" })
           })],
           series, current: TOTALS_MANIFEST,
-          expected: TABLE_MANIFEST
+          expected: GRID_MANIFEST
         },
         {
           splits: [new Split({
@@ -175,7 +137,7 @@ describe("EssenceProps", () => {
             sort: new DimensionSort({ reference: "time", direction: SortDirection.ascending })
           })],
           series,
-          current: null,
+          current: null as VisualizationManifest,
           expected: LINE_CHART_MANIFEST
         }
       ];
@@ -183,9 +145,10 @@ describe("EssenceProps", () => {
       tests.forEach(({ splits, current, series, expected }) => {
         it(`chooses ${expected.name} given splits: [${splits}] with current ${current && current.name}`, () => {
           const { visualization } = Essence.getBestVisualization(
-            DataCubeFixtures.twitter(),
+            clientAppSettings,
+            twitterClientDataCube,
             Splits.fromSplits(splits),
-            SeriesList.fromMeasureNames(series),
+            SeriesList.fromSeries(series),
             current);
 
           expect(visualization).to.deep.equal(expected);
@@ -217,11 +180,11 @@ describe("EssenceProps", () => {
         expect(essence.visResolve.isReady()).to.be.true;
       });
 
-      it("defaults to table with non continuous dimension", () => {
+      it("defaults to grid with non continuous dimension", () => {
         const essence = EssenceFixtures.twitterNoVisualisation()
           .changeVisualization(TOTALS_MANIFEST)
           .addSplit(twitterHandleSplit, VisStrategy.FairGame);
-        expect(essence.visualization).to.deep.equal(TABLE_MANIFEST);
+        expect(essence.visualization).to.deep.equal(GRID_MANIFEST);
         expect(essence.visResolve.isReady()).to.be.true;
       });
 
@@ -267,7 +230,7 @@ describe("EssenceProps", () => {
       const noMeasuresTests = [
         { splits: [timeSplit], visualization: LINE_CHART_MANIFEST },
         { splits: [tweetLengthSplit], visualization: BAR_CHART_MANIFEST },
-        { splits: [twitterHandleSplit], visualization: TABLE_MANIFEST }
+        { splits: [twitterHandleSplit], visualization: GRID_MANIFEST }
       ];
 
       noMeasuresTests.forEach(({ splits, visualization }) => {
@@ -286,7 +249,7 @@ describe("EssenceProps", () => {
           expect(withoutSplit.visualization).to.deep.equal(visualization);
           expect(withoutSplit.visResolve.isManual(), "is manual after removing split").to.be.true;
 
-          const toggledAgain = withoutSplit.addSeries(MeasureSeries.fromMeasure(MeasureFixtures.twitterCount()));
+          const toggledAgain = withoutSplit.addSeries(MeasureSeries.fromMeasure(MeasureFixtures.count()));
           expect(toggledAgain.visualization).to.deep.equal(visualization);
           expect(toggledAgain.visResolve.isManual(), "is manual after second toggle").to.be.true;
         });
@@ -297,14 +260,10 @@ describe("EssenceProps", () => {
       });
 
       it("should handle adding too many splits for table", () => {
-        console.log("start it");
         const essence = EssenceFixtures.wikiTable();
-        console.log("splits before", essence.splits.length());
         const addedSplit = essence.addSplit(timeSplit, VisStrategy.KeepAlways);
-        console.log("splits after", addedSplit.splits.length());
 
         expect(addedSplit.splits.length()).to.be.eq(5);
-        console.log("visResolve", addedSplit.visResolve.state);
         expect(addedSplit.visResolve.isManual()).to.be.true;
         expect(addedSplit.visResolve.resolutions[0].adjustment.splits.length()).to.be.eq(4);
       });
@@ -313,7 +272,7 @@ describe("EssenceProps", () => {
     describe("#changeVisualisation", () => {
       [TABLE_MANIFEST, LINE_CHART_MANIFEST, BAR_CHART_MANIFEST].forEach(manifest => {
         it("it sets visResolve to manual", () => {
-          const essence = EssenceFixtures.twitterNoVisualisation().changeVisualization(manifest);
+          const essence = EssenceFixtures.twitterNoVisualisation().changeVisualization(manifest as VisualizationManifest);
           expect(essence.visualization.name).to.deep.equal(manifest.name);
           expect(essence.visResolve.isManual()).to.be.true;
         });

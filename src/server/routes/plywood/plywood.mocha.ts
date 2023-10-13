@@ -16,18 +16,20 @@
  */
 
 import * as bodyParser from "body-parser";
-import * as express from "express";
+import express from "express";
 import { $ } from "plywood";
-import * as supertest from "supertest";
-import { AppSettingsFixtures } from "../../../common/models/app-settings/app-settings.fixtures";
+import supertest from "supertest";
+import { NOOP_LOGGER } from "../../../common/logger/logger";
+import { wikiSourcesWithExecutor } from "../../../common/models/sources/sources.fixtures";
 import { plywoodRouter } from "./plywood";
 
 const settingsManagerFixture = {
-  getSettings: () => Promise.resolve(AppSettingsFixtures.wikiOnlyWithExecutor()),
-  anchorPath: "."
+  getSources: () => Promise.resolve(wikiSourcesWithExecutor),
+  anchorPath: ".",
+  logger: NOOP_LOGGER
 };
 
-let app = express();
+const app = express();
 
 app.use(bodyParser.json());
 
@@ -44,7 +46,7 @@ describe("plywood router", () => {
       })
       .expect("Content-Type", "application/json; charset=utf-8")
       .expect(400)
-      .expect({ error: "must have a dataCube" }, testComplete);
+      .expect({ error: "Parameter dataCube is required" }, testComplete);
   });
 
   it("does a query (value)", (testComplete: any) => {

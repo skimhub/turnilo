@@ -1,51 +1,73 @@
 name: Deploy
 
 on:
-  push:
-    branches:
-      - master
+  workflow_dispatch: ~
+  workflow_call: ~
 
 jobs:
   deploy:
-
     runs-on: ubuntu-latest
 
+    # disable for PRs from forks
+    if: ${{ !github.event.pull_request.head.repo.fork }}
+
     env:
-      IMAGE_NAME: eu.gcr.io/${{ secrets.GCP_PROJECT_ID }}/turnilo
+      TAG_NAME: ${{ github.head_ref || 'latest' }}
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v2
+        uses: actions/checkout@v3
 
-      - name: Authenticate on GCP
-        uses: google-github-actions/setup-gcloud@master
+      - name: Setup GCloud
+        uses: ./.github/actions/gcloud
         with:
-          project_id: ${{ secrets.GCP_PROJECT_ID }}
-          service_account_key: ${{ secrets.GCP_SA_KEY }}
-          export_default_credentials: true
+          credentials_json: ${{ secrets.GCP_SA_KEY }}
+
+      - name: Set Docker image name
+        run: echo "IMAGE_NAME=eu.gcr.io/$GCP_PROJECT/turnilo" >> $GITHUB_ENV
 
       - name: Configure Docker
         run: gcloud auth configure-docker --quiet
 
       - name: Build Docker image
-        run: docker build . -t $IMAGE_NAME:latest
+        run: docker build . -t $IMAGE_NAME:${TAG_NAME//[^a-z0-9]/-}
 
       - name: Push Docker image
-        run: docker push $IMAGE_NAME:latest
+        run: docker push $IMAGE_NAME:${TAG_NAME//[^a-z0-9]/-}
 
-      - name: Deploy on GCP
+      - name: Deploy app
         run: |
-          gcloud run deploy turnilo \
-            --image $IMAGE_NAME:latest \
+          gcloud run deploy turnilo-${TAG_NAME//[^a-z0-9]/-} \
+            --image $IMAGE_NAME:${TAG_NAME//[^a-z0-9]/-} \
             --region europe-west1 \
             --platform managed \
             --allow-unauthenticated \
             --quiet \
             --port 9090 \
             --cpu 1 --memory 1G --max-instances 1 --concurrency 80 \
-            --args="--examples"
+            --args="run-examples"
 
-      - name: Delete previous Docker image
+      - name: Get app URL
+        if: ${{ github.head_ref }}
+        id: app-url
+        run: |
+          echo ::set-output name=app_url::$(gcloud run services describe turnilo-${TAG_NAME//[^a-z0-9]/-} --region europe-west1 --format 'value(status.url)')
+
+      - name: Print app URL
+        if: ${{ github.head_ref }}
+        uses: actions/github-script@v6
+        env:
+          APP_URL: ${{ steps.app-url.outputs.app_url }}
+        with:
+          script: |
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: ':white_check_mark: Deployed successfully to: ' + process.env.APP_URL
+            })
+
+      - name: Delete previous Docker image(s)
         run: |
           gcloud container images list-tags $IMAGE_NAME --filter='-tags:*' --format='get(digest)' --limit=unlimited | \
           xargs -I {digest} gcloud container images delete "$IMAGE_NAME@{digest}" --quiet

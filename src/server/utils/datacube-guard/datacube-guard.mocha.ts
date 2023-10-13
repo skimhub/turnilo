@@ -16,7 +16,7 @@
 
 import { expect } from "chai";
 import { Request } from "express";
-import { DataCubeFixtures } from "../../../common/models/data-cube/data-cube.fixtures";
+import { customCubeWithGuard } from "../../../common/models/data-cube/data-cube.fixtures";
 import { allowDataCubesHeaderName, checkAccess } from "./datacube-guard";
 
 function mockHeaders(allowedDataCubes: string): Request["headers"] {
@@ -26,33 +26,30 @@ function mockHeaders(allowedDataCubes: string): Request["headers"] {
 describe("Guard test", () => {
 
   it("Guard off -> header for cube A and accessing cube B", () => {
-    let dataCubeB = DataCubeFixtures.customCubeWithGuard();
-    dataCubeB.name = "cubeB";
-    dataCubeB.cluster.guardDataCubes = false;
+    const dataCubeB = customCubeWithGuard("cubeB", false);
     expect(checkAccess(dataCubeB, mockHeaders("cubeA"))).to.equal(true);
   });
 
   it("Guard off -> access to all dataCubes", () => {
-    let dataCube = DataCubeFixtures.customCubeWithGuard();
-    dataCube.cluster.guardDataCubes = false;
+    const dataCube = customCubeWithGuard(null, false);
     expect(checkAccess(dataCube, mockHeaders(""))).to.equal(true);
   });
 
   it("Guard on -> access denied", () => {
-    expect(checkAccess(DataCubeFixtures.customCubeWithGuard(), mockHeaders(""))).to.equal(false);
+    expect(checkAccess(customCubeWithGuard(), mockHeaders(""))).to.equal(false);
   });
 
   it("Guard on -> access denied", () => {
-    expect(checkAccess(DataCubeFixtures.customCubeWithGuard(), mockHeaders("some,name"))).to.equal(false);
+    expect(checkAccess(customCubeWithGuard(), mockHeaders("some,name"))).to.equal(false);
   });
 
   it("Guard on -> access allowed: wildchar", () => {
-    let dataCube = DataCubeFixtures.customCubeWithGuard();
+    const dataCube = customCubeWithGuard();
     expect(checkAccess(dataCube, mockHeaders("*,some-other-name"))).to.equal(true);
   });
 
   it("Guard on -> access allowed: datacube allowed", () => {
-    let dataCube = DataCubeFixtures.customCubeWithGuard();
+    const dataCube = customCubeWithGuard();
     expect(checkAccess(dataCube, mockHeaders("some-name,some-other-name"))).to.equal(true);
   });
 });

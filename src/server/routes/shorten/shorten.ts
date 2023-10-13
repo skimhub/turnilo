@@ -16,29 +16,28 @@
 
 import { Request, Response, Router } from "express";
 import * as request from "request-promise-native";
+import { errorToMessage } from "../../../common/logger/logger";
 import { UrlShortenerContext } from "../../../common/models/url-shortener/url-shortener";
-import { SettingsGetter } from "../../utils/settings-manager/settings-manager";
+import { SettingsManager } from "../../utils/settings-manager/settings-manager";
 
-export function shortenRouter(settingsGetter: SettingsGetter, isTrustedProxy: boolean) {
+export function shortenRouter(settings: Pick<SettingsManager, "appSettings" | "logger">, isTrustedProxy: boolean) {
+  const logger = settings.logger;
 
   const router = Router();
 
   router.get("/", async (req: Request, res: Response) => {
     const { url } = req.query;
     try {
-      const settings = await settingsGetter();
-      const shortener = settings.customization.urlShortener;
+      const shortener = settings.appSettings.customization.urlShortener;
       const context: UrlShortenerContext = {
         // If trust proxy is not enabled, app is understood as directly facing the internet
         clientIp: isTrustedProxy ? req.ip : req.connection.remoteAddress
       };
-      const shortUrl = await shortener.shortenerFunction(request, url, context);
+      const shortUrl = await shortener(request, url as string, context);
       res.json({ shortUrl });
     } catch (error) {
-      console.log("error:", error.message);
-      if (error.hasOwnProperty("stack")) {
-        console.log((<any> error).stack);
-      }
+      logger.error(errorToMessage(error));
+
       res.status(500).send({
         error: "could not shorten url",
         message: error.message

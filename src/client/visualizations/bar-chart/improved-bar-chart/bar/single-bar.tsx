@@ -15,10 +15,11 @@
  */
 
 import { Datum } from "plywood";
-import * as React from "react";
+import React from "react";
 import { ConcreteSeries } from "../../../../../common/models/series/concrete-series";
-import { Unary } from "../../../../../common/utils/functional/functional";
 import { LinearScale } from "../../../../utils/linear-scale/linear-scale";
+import { useSettingsContext } from "../../../../views/cube-view/settings-context";
+import { BaseBarChartModel } from "../utils/bar-chart-model";
 import { DomainValue } from "../utils/x-domain";
 import { XScale } from "../utils/x-scale";
 import { SIDE_PADDING } from "./padding";
@@ -28,23 +29,26 @@ interface SingleBarProps {
   yScale: LinearScale;
   xScale: XScale;
   series: ConcreteSeries;
-  getX: Unary<Datum, DomainValue>;
+  model: BaseBarChartModel;
 }
 
-export const SingleBar: React.SFC<SingleBarProps> = props => {
-  const { datum, xScale, yScale, getX, series } = props;
+export const SingleBar: React.FunctionComponent<SingleBarProps> = props => {
+  const { customization: { visualizationColors } } = useSettingsContext();
+  const { datum, xScale, yScale, model: { continuousSplit }, series } = props;
   const [maxHeight] = yScale.range();
-  const x = getX(datum);
+  const x = continuousSplit.selectValue<DomainValue>(datum);
   const xPos = xScale.calculate(x) + SIDE_PADDING;
-  const width = xScale.rangeBand() - (2 * SIDE_PADDING);
+  const width = xScale.bandwidth() - (2 * SIDE_PADDING);
   const y = series.selectValue(datum);
   const yPos = yScale(y);
   const height = maxHeight - yPos;
+  const fill = visualizationColors.main;
 
   return <rect
     className="bar-chart-bar"
     x={xPos}
     y={yPos}
+    fill={fill}
     width={width}
     height={height} />;
 };

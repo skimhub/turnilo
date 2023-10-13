@@ -15,13 +15,13 @@
  * limitations under the License.
  */
 
-import * as path from "path";
 import { External } from "plywood";
 import { PlywoodRequester } from "plywood-base-api";
-import { DruidRequestDecorator } from "plywood-druid-requester";
+import { DecoratorRequest, DruidRequestDecorator } from "plywood-druid-requester";
 import { Logger } from "../../../common/logger/logger";
-import { Cluster } from "../../../common/models/cluster/cluster";
-import { noop } from "../../../common/utils/functional/functional";
+import { Cluster, makeExternalFromSourceName, shouldScanSources } from "../../../common/models/cluster/cluster";
+import { constant, noop } from "../../../common/utils/functional/functional";
+import { isNil } from "../../../common/utils/general/general";
 import { loadModule } from "../module-loader/module-loader";
 import { DruidRequestDecoratorModule } from "../request-decorator/request-decorator";
 import { properRequesterFactory } from "../requester/requester";
@@ -150,7 +150,7 @@ export class ClusterManager {
 
   private initRequester(): PlywoodRequester<any> {
     const { cluster } = this;
-    const druidRequestDecorator = this.loadRequestDecorator();
+    const druidRequestDecorator = this.createDruidRequestDecorator();
 
     return properRequesterFactory({
       cluster,
@@ -160,7 +160,39 @@ export class ClusterManager {
     });
   }
 
-  private loadRequestDecorator(): DruidRequestDecorator | undefined {
+  private clusterAuthHeaders(): Record<"Authorization", string> | undefined {
+    const { auth } = this.cluster;
+    if (isNil(auth)) return undefined;
+    switch (auth.type) {
+      case "http-basic": {
+        const credentials = `${auth.username}:${auth.password}`;
+        const Authorization = `Basic ${Buffer.from(credentials).toString("base64")}`;
+        return  { Authorization };
+      }
+    }
+  }
+
+  private createDruidRequestDecorator(): DruidRequestDecorator | undefined {
+    const requestDecorator = this.loadRequestDecoratorModule();
+    const authHeaders = this.clusterAuthHeaders();
+    if (isNil(requestDecorator)) {
+      if (isNil(authHeaders)) {
+        return undefined;
+      } else {
+        return constant( { headers: authHeaders });
+      }
+    }
+
+    if (isNil(authHeaders) ) return requestDecorator;
+
+    return (request: DecoratorRequest, context: object) => {
+      const decoration = requestDecorator(request, context);
+      return Promise.resolve(decoration).then(d => Object.assign(d, authHeaders));
+    };
+
+  }
+
+  private loadRequestDecoratorModule(): DruidRequestDecorator | undefined {
     const { cluster, logger, anchorPath } = this;
     if (!cluster.requestDecorator) return undefined;
     try {
@@ -173,7 +205,7 @@ export class ClusterManager {
       }
 
       logger.log(`Cluster ${cluster.name} creating requestDecorator`);
-      return module.druidRequestDecoratorFactory(logger.addPrefix("DruidRequestDecoratorFactory"), {
+      return module.druidRequestDecoratorFactory(logger.setLoggerId("DruidRequestDecoratorFactory"), {
         options: cluster.requestDecorator.options,
         cluster
       });
@@ -186,8 +218,8 @@ export class ClusterManager {
   private updateSourceListRefreshTimer() {
     const { logger, cluster } = this;
 
-    if (this.sourceListRefreshInterval !== cluster.getSourceListRefreshInterval()) {
-      this.sourceListRefreshInterval = cluster.getSourceListRefreshInterval();
+    if (this.sourceListRefreshInterval !== cluster.sourceListRefreshInterval) {
+      this.sourceListRefreshInterval = cluster.sourceListRefreshInterval;
 
       if (this.sourceListRefreshTimer) {
         logger.log(`Clearing sourceListRefresh timer in cluster '${cluster.name}'`);
@@ -195,7 +227,7 @@ export class ClusterManager {
         this.sourceListRefreshTimer = null;
       }
 
-      if (this.sourceListRefreshInterval && cluster.shouldScanSources()) {
+      if (this.sourceListRefreshInterval && shouldScanSources(cluster)) {
         logger.log(`Setting up sourceListRefresh timer in cluster '${cluster.name}' (every ${this.sourceListRefreshInterval}ms)`);
         this.sourceListRefreshTimer = setInterval(
           () => {
@@ -213,8 +245,8 @@ export class ClusterManager {
   private updateSourceReintrospectTimer() {
     const { logger, cluster } = this;
 
-    if (this.sourceReintrospectInterval !== cluster.getSourceReintrospectInterval()) {
-      this.sourceReintrospectInterval = cluster.getSourceReintrospectInterval();
+    if (this.sourceReintrospectInterval !== cluster.sourceReintrospectInterval) {
+      this.sourceReintrospectInterval = cluster.sourceReintrospectInterval;
 
       if (this.sourceReintrospectTimer) {
         logger.log(`Clearing sourceReintrospect timer in cluster '${cluster.name}'`);
@@ -317,7 +349,7 @@ export class ClusterManager {
   // See if any new sources were added to the cluster
   public scanSourceList = (): Promise<void> => {
     const { logger, cluster, verbose } = this;
-    if (!cluster.shouldScanSources()) return Promise.resolve(null);
+    if (!shouldScanSources(cluster)) return Promise.resolve(null);
 
     logger.log(`Scanning cluster '${cluster.name}' for new sources`);
     return (External.getConstructorFor(cluster.type) as any).getSourceList(this.requester)
@@ -325,7 +357,7 @@ export class ClusterManager {
         (sources: string[]) => {
           if (verbose) logger.log(`For cluster '${cluster.name}' got sources: [${sources.join(", ")}]`);
           // For every un-accounted source: make an external and add it to the managed list.
-          let introspectionTasks: Array<Promise<void>> = [];
+          const introspectionTasks: Array<Promise<void>> = [];
 
           this.managedExternals.forEach(ex => {
             if (sources.find(src => src === String(ex.external.source)) == null) {
@@ -349,7 +381,7 @@ export class ClusterManager {
 
             } else {
               logger.log(`Cluster '${cluster.name}' making external for '${source}'`);
-              const external = cluster.makeExternalFromSourceName(source, this.version).attachRequester(this.requester);
+              const external = makeExternalFromSourceName(source, this.version).attachRequester(this.requester);
               const newManagedExternal: ManagedExternal = {
                 name: this.generateExternalName(external),
                 external,
@@ -380,7 +412,7 @@ export class ClusterManager {
     return (External.getConstructorFor(cluster.type) as any).getSourceList(this.requester)
         .then(
             (sources: string[]) => {
-              let introspectionTasks: Array<Promise<void>> = [];
+              const introspectionTasks: Array<Promise<void>> = [];
               sources.forEach(source => {
                 const existingExternalsForSource = this.managedExternals.filter(managedExternal => externalContainsSource(managedExternal.external, source));
 

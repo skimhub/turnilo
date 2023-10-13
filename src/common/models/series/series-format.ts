@@ -15,7 +15,7 @@
  */
 
 import { Record } from "immutable";
-import * as numbro from "numbro";
+import numbro from "numbro";
 import { Unary } from "../../utils/functional/functional";
 import { isFiniteNumber, isNumber } from "../../utils/general/general";
 import { Measure } from "../measure/measure";
@@ -60,7 +60,7 @@ export const defaultFormatter = formatFnFactory(measureDefaultFormat);
 export function seriesFormatter(format: SeriesFormat, measure: Measure): Unary<number, string> {
   switch (format.type) {
     case SeriesFormatType.DEFAULT:
-      return measure.formatFn;
+      return formatFnFactory(measure.format);
     case SeriesFormatType.EXACT:
       return exactFormatter;
     case SeriesFormatType.PERCENT:

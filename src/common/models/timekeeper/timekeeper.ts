@@ -64,8 +64,8 @@ export class Timekeeper implements Instance<TimekeeperValue, TimekeeperJS> {
 
   getTime(name: string): Date {
     const timeTag = this.timeTags.get(name);
-    if (!timeTag || timeTag.special === "realtime") return this.now();
-    return timeTag.time || this.now();
+    if (!timeTag || !timeTag.time) return this.now();
+    return timeTag.time;
   }
 
   private changeTimeTags(timeTags: Map<string, TimeTag>): Timekeeper {
@@ -82,8 +82,8 @@ export class Timekeeper implements Instance<TimekeeperValue, TimekeeperJS> {
     return this.changeTimeTags(timeTags);
   }
 
-  addTimeTagFor(name: string): Timekeeper {
-    const timeTags = this.timeTags.set(name, new TimeTag({ name }));
+  addTimeTagFor(name: string, checkInterval: number): Timekeeper {
+    const timeTags = this.timeTags.set(name, new TimeTag({ name, checkInterval }));
     return this.changeTimeTags(timeTags);
   }
 
