@@ -15,13 +15,12 @@
  */
 
 import { expect } from "chai";
-import { DataCubeFixtures } from "../data-cube/data-cube.fixtures";
-import { Cluster } from "./cluster";
+import { fromConfig } from "./cluster";
 import { ClusterFixtures } from "./cluster.fixtures";
 import { findCluster } from "./find-cluster";
 
-const wikiCluster = Cluster.fromJS(ClusterFixtures.druidWikiClusterJS());
-const twitterCluster = Cluster.fromJS(ClusterFixtures.druidTwitterClusterJS());
+const wikiCluster = fromConfig(ClusterFixtures.druidWikiClusterJS());
+const twitterCluster = fromConfig(ClusterFixtures.druidTwitterClusterJS());
 
 const clusters = [
   wikiCluster,
@@ -40,7 +39,11 @@ describe("findCluster", () => {
   });
 
   it("should return cluster for non-native data cube", () => {
-    const wikiDataCube = DataCubeFixtures.WIKI_JS;
+    const wikiDataCube = {
+      clusterName: "druid-wiki",
+      name: "wiki",
+      source: "wiki"
+    };
     const cluster = findCluster(wikiDataCube, clusters);
     expect(cluster).to.be.equal(wikiCluster);
   });

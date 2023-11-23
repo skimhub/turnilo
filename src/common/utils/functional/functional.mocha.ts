@@ -24,6 +24,7 @@ import {
   concatTruthy,
   cons,
   constant,
+  cyclicShift,
   debounceWithPromise,
   flatMap,
   mapTruthy,
@@ -31,7 +32,7 @@ import {
   replaceAt,
   thread,
   threadConditionally,
-  threadNullable,
+  threadNullable, values,
   zip
 } from "./functional";
 
@@ -89,6 +90,12 @@ describe("Functional utilities", () => {
     });
   });
 
+  describe("cyclicShift", () => {
+    it("should rotate array by one element", () => {
+      expect(cyclicShift([1, 2, 3, 4], 1)).to.deep.eq([2, 3, 4, 1]);
+    });
+  });
+
   describe("zip", () => {
     it("should merge arrays with same length", () => {
       expect(zip([1, 2, 3], ["a", "b", "c"])).to.deep.eq([
@@ -110,6 +117,19 @@ describe("Functional utilities", () => {
         [1, "a"],
         [2, "b"]
       ]);
+    });
+  });
+
+  describe("values", () => {
+    it("should return all values from object", () => {
+      const input = {
+        a: "foobar",
+        b: "bazz",
+        c: 42,
+        d: "qvux",
+        e: true
+      };
+      expect(values(input)).to.deep.equal(["foobar", "bazz", 42, "qvux", true]);
     });
   });
 

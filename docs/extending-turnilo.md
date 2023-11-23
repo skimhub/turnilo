@@ -1,7 +1,8 @@
-# Extending Turnilo
-
-* TOC
-{:toc}
+---
+title: Extending Turnilo
+nav_order: 8
+layout: page
+---
 
 ## Overview
 
@@ -10,6 +11,28 @@ Turnilo lets you extend its behaviour in three ways:
 * Request decorator for all Druid queries sent to Druid cluster
 * Query decorator for all Plywood queries sent to Druid cluster
 * Plugins for backend application
+
+## turniloMetadata
+
+Turnilo adds `turniloMetadata` object to every `Request` object. 
+It is a namespace for you to keep any values necessary that live with requests.
+
+`turniloMetadata` has special properties:
+
+### `loggerContext` 
+
+It is a `Record` of values that will be added by logger for every message.
+
+You could use it to log User Agent of browser that requested view with a simple [plugin](#plugins):
+
+```javascript
+app.use(function(req, res, next) {
+  req.turniloMetadata.loggerContext.userAgent = req.get('User-Agent');
+  next();
+});
+```
+
+
 
 ## Request decorator
 
@@ -27,10 +50,10 @@ to your `druidRequestDecoratorFactory` under `options` key in second parameter.
 druidRequestDecorator: 
     path: './druid-request-decorator.js'
     options:
-        keyA: valueA
-        keyB:
-          - firstElement
-          - secondElement
+        base: Pancakes
+        extras:
+          - maple-syrup
+          - blueberries
 ```
 
 The contract is that your module should export a function `druidRequestDecoratorFactory` that has to return a decorator.
@@ -45,26 +68,23 @@ exports.version = 1;
 
 exports.druidRequestDecoratorFactory = function (logger, params) {
   const options = params.options;
-  const username = options.username;
-  const password = options.password;
+  const extras = options.extras.join(", ");
 
-  const auth = "Basic " + Buffer.from(`${username}:${password}`).toString("base64");
+  const like = `${options.base} with ${extras}`;
 
   return function () {
     return {
       headers: {
-        "Authorization": auth
+        "X-I-Like": like
       },
     };
   };
 };
 ```
 
-You can find this example with additional comments and example config in the [./example](./example/request-decoration) folder.
+You can find this example with additional comments and example config in the [example](example/request-decoration) folder.
 
-This would result in all Druid requests being tagged as:
-
-![decoration example](./example/request-decoration/result.png)
+Please note that your object will be merged with [Cluster Authorization](configuration-cluster.md) headers.
 
 ## Query decorator
 
@@ -86,7 +106,7 @@ exports.decorator = function (expression, request, options, plywood) {
   const filterClause = plywood.$(userColumnName).in([userId]); // show only rows where `userColumnName` is equal to current user id.
   return expression.substitute(e => {
     if (e instanceof plywood.RefExpression && e.name === "main") { // filter all main expression references
-      e.filter(filterClause);
+      return e.filter(filterClause);
     }
     return null;
   });
@@ -112,7 +132,7 @@ You need to add your plugin as entry under `plugins` field.
 Plugin need to have two fields:
     - `name` - name for debug purposes
     - `path` - path to the js file
-It can define additional field `settings`. Content of this field would be passed to plugin so it is good place for additional parameters.
+It can define additional field `settings`. Content of this field would be passed to plugin, so it is good place for additional parameters.
 
 ```yaml
 plugins:
@@ -133,5 +153,4 @@ This function will be called at the start of application with following paramete
 Worth to look into !(express documentation)[https://expressjs.com/en/api.html#app]. 
 Use `get`, `post` etc. to define new endpoints. Use `use` to define middleware.
 
-Additionally, Turnilo defines empty object on Request object under `turniloMetadata` key. 
-Here you can pass values between your plugins and not pollute headers.
+Use [`turniloMetadata`](#turniloMetadata) object on `Request` to pass values between your plugins and not pollute headers.

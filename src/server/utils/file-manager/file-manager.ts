@@ -15,15 +15,15 @@
  * limitations under the License.
  */
 
-import * as fs from "fs-promise";
+import * as fse from "fs-extra";
 import * as path from "path";
 import { Dataset, Expression, PseudoDatum } from "plywood";
 import { Logger } from "../../../common/logger/logger";
 import { noop } from "../../../common/utils/functional/functional";
-import { parseData } from "../../../common/utils/parser/parser";
+import { parseData } from "../parser/parser";
 
 export function getFileData(filePath: string): Promise<any[]> {
-  return fs.readFile(filePath, "utf-8")
+  return fse.readFile(filePath, "utf-8")
     .then(fileData => {
       try {
         return parseData(fileData, path.extname(filePath));
@@ -78,7 +78,7 @@ export class FileManager {
       .then(
         rawData => {
           logger.log(`Loaded file ${filePath} (rows = ${rawData.length})`);
-          var dataset = Dataset.fromJS(rawData).hide();
+          let dataset = Dataset.fromJS(rawData).hide();
 
           if (this.subsetExpression) {
             dataset = dataset.filter(this.subsetExpression);

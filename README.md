@@ -2,6 +2,7 @@
 
 [![npm version](https://img.shields.io/npm/v/turnilo.svg)](https://www.npmjs.org/package/turnilo)
 [![build status](https://github.com/allegro/turnilo/workflows/Build/badge.svg)](https://github.com/allegro/turnilo/actions)
+[![Join our Slack chat](https://img.shields.io/badge/slack-chat-purple.svg?logo=slack)](https://join.slack.com/t/turnilo/shared_invite/enQtOTI4ODcxMjcyNjU2LTFlOTk5YWZlOGMyZDZhZWU3MGNjNDRhZmI1Y2UzNDlkZmY3YzYxYTJhYzIzMzc0MTc3MzA3OTE1NmQ5NDI1M2I)
 
 Turnilo is a business intelligence, data exploration and visualization web application for [Apache Druid](https://druid.apache.org).
 Turnilo is a fork of [Pivot](https://github.com/implydata/pivot) which is currently available under commercial licence only.
@@ -36,7 +37,7 @@ this is how Turnilo emerged.
 * Unified view for historical and real-time data.
 * Blazingly fast.
 
-![Turnilo UI](https://github.com/allegro/turnilo/raw/master/docs/images/showcase.gif)
+![Turnilo UI](https://github.com/allegro/turnilo/raw/master/docs/assets/images/showcase.gif)
 
 ## Try it!
 
@@ -49,7 +50,7 @@ or join the chat on [Slack](https://join.slack.com/t/turnilo/shared_invite/enQtO
 
 ## Pre-requisites
 
-* [Node.js](https://nodejs.org/) - 12.x or 14.x version
+* [Node.js](https://nodejs.org/) - 14.x or 16.x version
 
 :warning:
 Do not use `yarn` command for dependency management and project build, use `npm` instead.
@@ -63,18 +64,18 @@ Install Turnilo distribution using [npm](https://www.npmjs.com/).
 npm install -g turnilo
 ```
 
-Start off by running an example with Covid-19 and Wikipedia datasets
+Start off by running Turnilo with example datasets
 and open [http://localhost:9090/](http://localhost:9090/).
 
 ```
-turnilo --examples
+turnilo run-examples
 ```
 
-Or connect to the existing Druid broker using `--druid` command line option.
+Use `connect-druid` command to connect to the existing Druid broker.
 Turnilo will automatically introspect your Druid broker and figure out available datasets.
 
 ```
-turnilo --druid http[s]://druid-broker-hostname[:port]
+turnilo connect-druid http[s]://druid-broker-hostname[:port]
 ```
 
 ## Documentation
@@ -98,7 +99,7 @@ npm run build
 
 ### Run project
 
-Run Covid-19 and Wikipedia examples.
+Run example datasets.
 
 ```
 npm run start:examples
@@ -107,20 +108,20 @@ npm run start:examples
 Connect to the existing Druid broker.
 
 ```
-npm run start -- --druid http[s]://druid-broker-hostname[:port]
+npm run start -- connect-druid http[s]://druid-broker-hostname[:port]
 ```
 
 Connect to the existing Druid broker using your config file.
 
 ```
-npm run start -- --config path/to/config.yml
+npm run start -- run-config path/to/config.yml
 ```
 
 ### Run project in developer mode
 
 Every change in frontend code would recompile project and reload page.
 
-Run Covid-19 and Wikipedia examples.
+Run example datasets.
 
 ```
 npm run start:dev:examples
@@ -129,13 +130,13 @@ npm run start:dev:examples
 Connect to the existing Druid broker.
 
 ```
-npm run start:dev -- --druid http[s]://druid-broker-hostname[:port]
+npm run start:dev -- connect-druid http[s]://druid-broker-hostname[:port]
 ```
 
 Connect to the existing Druid broker using your config file.
 
 ```
-npm run start:dev -- --config path/to/config.yml
+npm run start:dev -- run-config path/to/config.yml
 ```
 
 
@@ -197,24 +198,11 @@ You can find more infrmation [here](https://www.jetbrains.com/help/webstorm/runn
 * [Ruby](https://www.ruby-lang.org/en/documentation/installation/)
 * [Bundler](https://bundler.io)
 
-Go to docs directory.
+Go to the docs folder and:
 
-```
-cd docs
-```
-
-Install dependencies.
-
-```
-bundle install 
-```
-
-Run your Jekyll site locally and open [http://localhost:4000/](http://localhost:4000/)
-
-```
-bundle exec jekyll serve --incremental
-```
-
+1. Install `bundle install` or `update bundle` update dependencies
+2. Run `bundle exec jekyll serve --livereload`
+3. Open [http://localhost:4000/](http://localhost:4000/)
 
 ## License
 
