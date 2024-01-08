@@ -26,8 +26,9 @@ import {
   getNumberOfWholeDigits,
   isDecimalInteger,
   toSignificantDigits
-} from "../../../common/utils/general/general";
+} from "../../utils/general/general";
 import { isFloorableDuration, isValidDuration } from "../../utils/plywood/duration";
+import { DimensionKind } from "../dimension/dimension";
 import { Bucket } from "../split/split";
 
 const MENU_LENGTH = 5;
@@ -66,7 +67,7 @@ function makeCheckpoint(checkPoint: number, returnValue: Bucket): Checker {
 }
 
 function makeNumberBuckets(centerAround: number, count: number, coarse?: boolean): number[] {
-  let granularities: number[] = [];
+  const granularities: number[] = [];
   let logTen = Math.log(centerAround) / Math.LN10;
   const digits = getNumberOfWholeDigits(centerAround);
   const decimalBase = 10;
@@ -215,6 +216,19 @@ export function granularityFromJS(input: GranularityJS): Bucket {
   throw new Error("input should be number or Duration");
 }
 
+export function coerceGranularity(granularity: string, kind: DimensionKind): Bucket | null {
+  switch (kind) {
+    case "string":
+      return null;
+    case "boolean":
+      return null;
+    case "time":
+      return Duration.fromJS(granularity);
+    case "number":
+      return parseInt(granularity, 10);
+  }
+}
+
 export function granularityToString(input: Bucket): string {
   return input.toString();
 }
@@ -237,11 +251,6 @@ export function granularityEquals(g1: Bucket, g2: Bucket) {
   return g1 === g2;
 }
 
-export function granularityToJS(input: Bucket): GranularityJS {
-  if (input instanceof Duration) return input.toJS();
-  return input;
-}
-
 export function getGranularities(kind: ContinuousDimensionKind, bucketedBy?: Bucket, coarse?: boolean): Bucket[] {
   const kindHelper = getHelperForKind(kind);
   const coarseGranularities = kindHelper.coarseGranularities;
@@ -255,10 +264,6 @@ export function getDefaultGranularityForKind(kind: ContinuousDimensionKind, buck
   if (bucketedBy) return bucketedBy;
   if (customGranularities) return customGranularities[2];
   return getHelperForKind(kind).defaultGranularity;
-}
-
-export function getBestGranularityForRange(inputRange: BucketableRange, bigChecker: boolean, bucketedBy?: Bucket, customGranularities?: Bucket[]): Bucket {
-  return getBestBucketUnitForRange(inputRange, bigChecker, bucketedBy, customGranularities);
 }
 
 export function getBestBucketUnitForRange(inputRange: BucketableRange, bigChecker: boolean, bucketedBy?: Bucket, customGranularities?: Bucket[]): Bucket {

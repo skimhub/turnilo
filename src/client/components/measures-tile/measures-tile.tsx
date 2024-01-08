@@ -15,11 +15,12 @@
  * limitations under the License.
  */
 
-import * as React from "react";
+import React from "react";
 import { Component, DragEvent, MouseEvent } from "react";
 import { Clicker } from "../../../common/models/clicker/clicker";
 import { Essence } from "../../../common/models/essence/essence";
 import { Measure } from "../../../common/models/measure/measure";
+import { findMeasureByName } from "../../../common/models/measure/measures";
 import { SeriesList } from "../../../common/models/series-list/series-list";
 import { Series } from "../../../common/models/series/series";
 import { Stage } from "../../../common/models/stage/stage";
@@ -30,14 +31,14 @@ import { DragManager } from "../../utils/drag-manager/drag-manager";
 import { MeasureActionsMenu } from "../measure-actions-menu/measure-actions-menu";
 import { SearchableTile } from "../searchable-tile/searchable-tile";
 import { MEASURE_CLASS_NAME } from "./measure-item";
-import { MeasureOrGroupForView, MeasuresConverter } from "./measures-converter";
+import { convert, MeasureOrGroupForView } from "./measures-converter";
 import { MeasuresRenderer } from "./measures-renderer";
 
 export interface MeasuresTileProps {
   clicker: Clicker;
   essence: Essence;
   menuStage: Stage;
-  appendDirtySeries: Unary<Series, void>;
+  addPartialSeries: Unary<Series, void>;
   style?: React.CSSProperties;
 }
 
@@ -67,7 +68,7 @@ export class MeasuresTile extends Component<MeasuresTileProps, MeasuresTileState
     menuMeasure: null
   };
 
-  measureClick = (measureName: string, e: MouseEvent<HTMLElement>) => {
+  private measureClick = (measureName: string, e: MouseEvent<HTMLElement>) => {
     const { menuOpenOn } = this.state;
     const target = findParentWithClass(e.target as Element, MEASURE_CLASS_NAME);
     if (menuOpenOn === target) {
@@ -76,7 +77,7 @@ export class MeasuresTile extends Component<MeasuresTileProps, MeasuresTileState
     }
 
     const { essence: { dataCube } } = this.props;
-    const measure = dataCube.measures.getMeasureByName(measureName);
+    const measure = findMeasureByName(dataCube.measures, measureName);
 
     this.setState({
       menuOpenOn: target,
@@ -95,7 +96,7 @@ export class MeasuresTile extends Component<MeasuresTileProps, MeasuresTileState
 
   dragStart = (measureName: string, e: DragEvent<HTMLElement>) => {
     const { essence: { dataCube } } = this.props;
-    const measure = dataCube.getMeasure(measureName);
+    const measure = findMeasureByName(dataCube.measures, measureName);
 
     const dataTransfer = e.dataTransfer;
     dataTransfer.effectAllowed = "all";
@@ -135,10 +136,11 @@ export class MeasuresTile extends Component<MeasuresTileProps, MeasuresTileState
     const { showSearch, searchText } = this.state;
     const { dataCube } = essence;
 
-    const measuresConverter = new MeasuresConverter(
+    const measuresForView = convert(
+      dataCube.measures,
       hasSearchTextPredicate(searchText),
-      isSelectedMeasurePredicate(essence.series));
-    const measuresForView = dataCube.measures.accept(measuresConverter);
+      isSelectedMeasurePredicate(essence.series)
+    );
 
     const measuresRenderer = new MeasuresRenderer(this.measureClick, this.dragStart, searchText);
     const rows = measuresRenderer.render(measuresForView);
@@ -177,12 +179,12 @@ export class MeasuresTile extends Component<MeasuresTileProps, MeasuresTileState
   };
 
   private renderMenu() {
-    const { essence, appendDirtySeries, menuStage } = this.props;
+    const { essence, addPartialSeries, menuStage } = this.props;
     const { menuOpenOn, menuMeasure } = this.state;
     if (!menuMeasure) return null;
 
     return <MeasureActionsMenu
-      appendDirtySeries={appendDirtySeries}
+      addPartialSeries={addPartialSeries}
       addSeries={this.addSeries}
       series={essence.series}
       direction="right"

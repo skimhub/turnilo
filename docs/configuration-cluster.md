@@ -1,11 +1,12 @@
-# Configuring Turnilo
-
-* TOC
-{:toc}
+---
+title: Configuration - cluster
+nav_order: 2
+layout: page
+---
 
 ## Overview
 
-It is easy to start using Turnilo with Druid by pointing it at your Druid cluster: `turnilo --druid broker_host:broker_port`
+It is easy to start using Turnilo with Druid by pointing it at your Druid cluster: `turnilo connect-druid broker_host:broker_port`
 Turnilo will automatically introspect your Druid cluster and figure out available datasets.
 
 Turnilo can be configured with a *config* YAML file. While you could write one from scratch it is recommended to let
@@ -14,13 +15,13 @@ Turnilo give you a head start by using it to generate a config file for you usin
 Run:
 
 ```bash
-turnilo --druid broker_host:broker_port --print-config --with-comments > config.yaml
+turnilo introspect-druid broker_host:broker_port --verbose > config.yaml
 ```
 
 This will cause Turnilo to go through its normal startup and introspection routine and then dump the internally generated
 config (complete with comments) into the provided file.
 
-You can now run `turnilo --config config.yaml` to run Turnilo with your config.
+You can now run `turnilo run-config config.yaml` to run Turnilo with your config.
 
 The next step is to open the generated config file in your favourite text editor and configure Turnilo to your liking.
 Below we will go through a typical configuration flow. At any point you can save the config and re-launch Turnilo to load
@@ -36,6 +37,17 @@ The port that Turnilo should run on.
 **verbose** (boolean), default: false
 
 Indicates that Turnilo should run in verbose mode. This will log all the queries done by Turnilo.
+
+**loggerFormat** *EXPERIMENTAL* (`plain` or `json`), default: `plain` 
+
+Format for logged message. 
+* `plain`: messages are logged as is.
+* `json`: messages are wrapped in object with additional metadata and logged as stringified JSON.
+
+Additional metadata for `json` format:
+* `@timestamp`: ISO 8601 timestamp of logged event
+* `level`: "INFO", "WARN", or "ERROR" string
+* `logger`: name of the logger
 
 **serverHost** (string), default: bind to all hosts
 
@@ -90,8 +102,8 @@ Should the server trust the `X-Forwarded-*` headers.  If "always", Turnilo will 
 
 Specify that Turnilo should set the [StrictTransportSecurity](https://developer.mozilla.org/en-US/docs/Web/Security/HTTP_strict_transport_security) header.
 
-Note that Turnilo can itself only run an http server.
-This option is intended to be used when when Turnilo is running behind a HTTPS terminator like AWS ELB.
+Note that Turnilo can itself only run a http server.
+This option is intended to be used when Turnilo is running behind an HTTPS terminator like AWS ELB.
 
 
 ## Configuring the Clusters
@@ -119,6 +131,25 @@ The url address (http[s]://hostname[:port]) of the cluster. If no port, 80 is as
 
 The host (hostname:port) of the cluster, http protocol is assumed. Deprecated, use **url** field
 
+**auth**
+
+The cluster authorization strategy.
+
+* Http Basic authorization
+
+Strategy will add `Authorization` header to each request to cluster and encode passed username and password with base64.
+
+```yaml
+auth:
+  type: "http-basic"
+  username: Aladdin
+  password: OpenSesame
+```
+
+This would result in all Druid request having added headers
+
+![](assets/images/basic-auth-headers.png)
+
 **version** (string)
 
 The explicit version to use for this cluster.
@@ -131,7 +162,7 @@ The timeout to set on the Druid queries in ms. See [documentation](https://druid
 **retry** (object)
 
 Options for retries on Druid native queries. If no object is provided Turnilo will not retry failed queries.
-Object should have following structure:
+Object should have the following structure:
 
 ```yaml
 retry:
@@ -167,6 +198,11 @@ This will put additional load on the data store but will ensure that dimension a
 **sourceReintrospectInterval** (number), minimum: 1000, default: 0
 
 How often should source schema be reloaded in ms. Default value of 0 disables periodical source refresh.
+
+**sourceTimeBoundaryRefreshInterval** (number), minimum: 1000, default: 60000
+
+How often should source max time be refreshed in ms. Turnilo sends [time boundary query](https://druid.apache.org/docs/latest/querying/timeboundaryquery.html) to Druid cluster to get source max time.
+Smaller values will ensure that turnilo is aware of freshly added data but also would put load on the data store with additional queries.
 
 
 ### Druid specific properties

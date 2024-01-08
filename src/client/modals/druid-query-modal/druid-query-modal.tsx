@@ -15,7 +15,7 @@
  */
 
 import { External } from "plywood";
-import * as React from "react";
+import React from "react";
 import { Essence } from "../../../common/models/essence/essence";
 import { Timekeeper } from "../../../common/models/timekeeper/timekeeper";
 import { Fn } from "../../../common/utils/general/general";
@@ -29,17 +29,21 @@ interface DruidQueryModalProps {
   timekeeper: Timekeeper;
 }
 
-export const DruidQueryModal: React.SFC<DruidQueryModalProps> = ({ onClose, timekeeper, essence }) => {
+export const DruidQueryModal: React.FunctionComponent<DruidQueryModalProps> = ({ onClose, timekeeper, essence }) => {
   const { visualization, dataCube: { attributes, source, options: { customAggregations, customTransforms } } } = essence;
   const queryFn = visualization.name === "grid" ? gridQuery : standardQuery;
   const query = queryFn(essence, timekeeper);
   const external = External.fromJS({ engine: "druid", attributes, source, customAggregations, customTransforms });
-  const plan = query.simulateQueryPlan({ main: external });
-  const planSource = JSON.stringify(plan, null, 2);
+  let plan;
+  try {
+    plan = JSON.stringify(query.simulateQueryPlan({ main: external }), null, 2);
+  } catch (e) {
+    plan = "Couldn't create Druid Query Plan.";
+  }
 
   return <SourceModal
     onClose={onClose}
     title="Druid query"
     copyLabel="Copy query"
-    source={planSource} />;
+    source={plan} />;
 };

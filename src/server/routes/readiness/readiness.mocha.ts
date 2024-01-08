@@ -15,13 +15,14 @@
  * limitations under the License.
  */
 
-import * as express from "express";
+import express from "express";
 import { Express } from "express";
 import * as http from "http";
-import * as nock from "nock";
-import * as supertest from "supertest";
-import { AppSettingsFixtures } from "../../../common/models/app-settings/app-settings.fixtures";
+import nock from "nock";
+import supertest from "supertest";
+import { NOOP_LOGGER } from "../../../common/logger/logger";
 import { ClusterFixtures } from "../../../common/models/cluster/cluster.fixtures";
+import { wikiSources, wikiTwitterSources } from "../../../common/models/sources/sources.fixtures";
 import { readinessRouter } from "./readiness";
 
 const loadStatusPath = "/druid/broker/v1/loadstatus";
@@ -43,7 +44,7 @@ describe("readiness router", () => {
   describe("single druid cluster", () => {
     before(done => {
       app = express();
-      app.use("/", readinessRouter(() => Promise.resolve(AppSettingsFixtures.wikiOnly())));
+      app.use("/", readinessRouter({ getSources: () => Promise.resolve(wikiSources), logger: NOOP_LOGGER }));
       server = app.listen(0, done);
     });
 
@@ -71,7 +72,7 @@ describe("readiness router", () => {
   describe("multiple druid clusters", () => {
     before(done => {
       app = express();
-      app.use("/", readinessRouter(() => Promise.resolve(AppSettingsFixtures.wikiTwitter())));
+      app.use("/", readinessRouter({ getSources: () => Promise.resolve(wikiTwitterSources), logger: NOOP_LOGGER }));
       server = app.listen(0, done);
     });
 
@@ -80,7 +81,7 @@ describe("readiness router", () => {
     });
 
     const multipleClustersTests: any[] = [
-     {
+      {
         scenario: "all healthy brokers",
         wikiBroker: { status: 200, initialized: true, delay: 0 },
         twitterBroker: { status: 200, initialized: true, delay: 0 },

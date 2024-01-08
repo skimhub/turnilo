@@ -14,8 +14,9 @@
     "rootDir": "src",
     "outDir": "build",
     "moduleResolution": "node",
+    "esModuleInterop": true,
     "jsx": "react",
     "lib": ["dom", "es6", "es5"],
-    "types": ["node", "express", "mocha", "webpack-env"]
+    "types": ["node", "express", "mocha", "cypress", "webpack-env"]
   }
 }

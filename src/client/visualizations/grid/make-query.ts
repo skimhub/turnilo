@@ -16,8 +16,12 @@
 
 import { List } from "immutable";
 import { $, Expression, LimitExpression, ply } from "plywood";
-import { DataCube } from "../../../common/models/data-cube/data-cube";
+import { ClientDataCube } from "../../../common/models/data-cube/data-cube";
+import { Dimension } from "../../../common/models/dimension/dimension";
+import { findDimensionByName } from "../../../common/models/dimension/dimensions";
 import { Essence } from "../../../common/models/essence/essence";
+import { toExpression } from "../../../common/models/filter-clause/filter-clause";
+import { Filter } from "../../../common/models/filter/filter";
 import { ConcreteSeries } from "../../../common/models/series/concrete-series";
 import { Sort } from "../../../common/models/sort/sort";
 import { Split, toExpression as splitToExpression } from "../../../common/models/split/split";
@@ -39,9 +43,7 @@ function applySeries(series: List<ConcreteSeries>, timeShiftEnv: TimeShiftEnv, n
   };
 }
 
-function applyLimit({ limit }: Split) {
-  // TODO: this calculation is for evaluation purpose. We should add custom split values for Grid and remove this multiplication!
-  const value = limit * 10;
+function applyLimit({ limit: value }: Split) {
   const limitExpression = new LimitExpression({ value });
   return (query: Expression) => query.performAction(limitExpression);
 }
@@ -50,7 +52,7 @@ function applySort(sort: Sort) {
   return (query: Expression) => query.performAction(sort.toExpression());
 }
 
-function applyCanonicalLength(splits: List<Split>, dataCube: DataCube) {
+function applyCanonicalLength(splits: List<Split>, dataCube: ClientDataCube) {
   return (exp: Expression) => {
     const canonicalLength = splits
       .map(split => splitCanonicalLength(split, dataCube))
@@ -61,19 +63,33 @@ function applyCanonicalLength(splits: List<Split>, dataCube: DataCube) {
   };
 }
 
+function applyDimensionFilter(dimensions: List<Dimension>, filter: Filter) {
+  return (query: Expression) => {
+    return dimensions.reduce((query, dimension) => {
+      if (dimension.kind !== "string" || !dimension.multiValue) return query;
+      const filterClause = filter.clauseForReference(dimension.name);
+      if (!filterClause) return query;
+      return query.filter(toExpression(filterClause, dimension));
+    }, query);
+  };
+}
+
 function applySplits(essence: Essence, timeShiftEnv: TimeShiftEnv): Expression {
-  const { splits: { splits }, dataCube } = essence;
+  const { splits: { splits }, dataCube, filter } = essence;
   const firstSplit = splits.first();
 
   const splitsMap = splits.reduce<Record<string, Expression>>((map, split) => {
-    const dimension = dataCube.getDimension(split.reference);
+    const dimension = findDimensionByName(dataCube.dimensions, split.reference);
     const { name } = dimension;
     const expression = splitToExpression(split, dimension, timeShiftEnv);
     return assoc(map, name, expression);
   }, {});
 
+  const dimensions = splits.map(split => findDimensionByName(dataCube.dimensions, split.reference));
+
   return thread(
     $main.split(splitsMap),
+    applyDimensionFilter(dimensions, filter),
     applyCanonicalLength(splits, dataCube),
     applySeries(essence.getConcreteSeries(), timeShiftEnv),
     applySort(firstSplit.sort),

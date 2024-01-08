@@ -1,0 +1,21 @@
+name: Setup
+description: Setup build
+
+inputs:
+  node-version:
+    required: true
+    default: '16'
+    description: Node version
+
+runs:
+  using: composite
+  steps:
+    - name: Use Node.js ${{ inputs.node-version }}
+      uses: actions/setup-node@v3
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: 'npm'
+
+    - name: Install dependencies
+      shell: bash
+      run: npm ci

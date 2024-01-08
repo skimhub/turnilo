@@ -15,7 +15,7 @@
  * limitations under the License.
  */
 
-import { AppSettings } from "../common/models/app-settings/app-settings";
+import { AppSettings, serialize } from "../common/models/app-settings/app-settings";
 import { Timekeeper } from "../common/models/timekeeper/timekeeper";
 
 export interface ViewOptions {
@@ -53,6 +53,7 @@ export function layout(options: ViewOptions, content: string): string {
   ${favicon(options)}
   <meta name="viewport" content="width=device-width, user-scalable=no, initial-scale=1, maximum-scale=1, minimum-scale=1">
   <title>${options.title}</title>
+  <link rel="stylesheet" href="main.css?v=${options.version}">
 </head>
 <body>
 ${content}
@@ -64,21 +65,20 @@ ${content}
 export function mainLayout(options: ViewOptions): string {
   const { version, appSettings, timekeeper } = options;
 
-  let cssOverrides: string | undefined;
-
-  if (appSettings.customization.cssVariables) {
-    const cssVariables = appSettings.customization.cssVariables;
-    const renderedCssVariables = Object.keys(cssVariables).map(name => `--${name}: ${cssVariables[name]};`).join("\n");
-    cssOverrides = `<style>
+  const cssVariables = appSettings.customization.cssVariables;
+  const renderedCssVariables = Object.keys(cssVariables).map(name => `--${name}: ${cssVariables[name]};`).join("\n");
+  const cssOverrides = `<style>
 :root {
   ${renderedCssVariables}
 }
 </style>`;
-  }
 
   return layout(options, `<div class="app-container"></div>
-<script>var __CONFIG__ = ${JSON.stringify({ version, appSettings, timekeeper })};</script>
-<script charset="UTF-8" src="main.js?v=${version}"></script>
+<script>var __CONFIG__ = ${JSON.stringify({ version, timekeeper, appSettings: serialize(appSettings) })};</script>
+<script charset="UTF-8" nomodule src="polyfills.es5.js?v=${version}"></script>
+<script charset="UTF-8" async src="dnd.es5.js?v=${version}"></script>
+<script charset="UTF-8" async nomodule src="main.es5.js?v=${version}"></script>
+<script charset="UTF-8" async type="module" src="main.js?v=${version}"></script>
 ${cssOverrides}`
   );
 }
