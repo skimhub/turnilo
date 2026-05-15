@@ -118,7 +118,7 @@ If Turnilo is not able to discover column type, it could be overridden with Drui
   nativeType: hyperUnique
 ```
 
-Supported native types: "hyperUnique", "thetaSketch" and "approximateHistogram".
+Supported native types: "hyperUnique", "thetaSketch", "HLLSketch", "approximateHistogram" and "quantilesDoublesSketch".
 
 ### Override numeric dimension
 
@@ -193,6 +193,8 @@ Specify whether the dimension should be bucketed by default. If unspecified defa
 **sortStrategy** ("self" \| `someMeasureName`)
 
 Specify a specific sort strategy for this dimension in visualizations. If unspecified defaults to best sort strategy based on the visualization.
+
+String dimension is sorted lexicographically, if an underlying Druid column is of a string type as well. However, if the Druid column type is long, it is sorted numerically in Turnilo - even for string dimensions (they should be castable to numeric ones). This is helpful, if you do not want value bucketing (which is turned on for numeric dimensions) and numerical sorting. 
 
 **kind** ("string" \| "boolean" \| "number" \| "time")
 
